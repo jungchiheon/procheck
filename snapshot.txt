@@ -10,7 +10,8 @@ SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhY
 
 ```
 NEXT_PUBLIC_SUPABASE_URL=https://qlzzuiqdlzqzzkdufzhb.supabase.co
-SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFsenp1aXFkbHpxenprZHVmemhiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjE4MTYzNjEsImV4cCI6MjA3NzM5MjM2MX0.UcAO1e6ED3Pg5c5iPanVNTocKR0IwzIRZX9JhyMqo_0
+SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFsenp1aXFkbHpxenprZHVmemhiIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2MTgxNjM2MSwiZXhwIjoyMDc3MzkyMzYxfQ.-VUiLUGniYOVu_sBjqc-Yl-9k8kaY2ux1MyRjFrG5YA
+eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFsenp1aXFkbHpxenprZHVmemhiIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2MTgxNjM2MSwiZXhwIjoyMDc3MzkyMzYxfQSUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFsenp1aXFkbHpxenprZHVmemhiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjE4MTYzNjEsImV4cCI6MjA3NzM5MjM2MX0.UcAO1e6ED3Pg5c5iPanVNTocKR0IwzIRZX9JhyMqo_0
 # (임시) 앱 시크릿 — 나중에 바꿀 예정
 APP_JWT_SECRET=dev-only-change-later
 ```
@@ -8057,7 +8058,7 @@ module.exports = {
 ===== FILE: public\sw.js =====
 
 ```
-if(!self.define){let e,s={};const a=(a,n)=>(a=new URL(a+".js",n).href,s[a]||new Promise(s=>{if("document"in self){const e=document.createElement("script");e.src=a,e.onload=s,document.head.appendChild(e)}else e=a,importScripts(a),s()}).then(()=>{let e=s[a];if(!e)throw new Error(`Module ${a} didn’t register its module`);return e}));self.define=(n,t)=>{const i=e||("document"in self?document.currentScript.src:"")||location.href;if(s[i])return;let c={};const r=e=>a(e,i),o={module:{uri:i},exports:c,require:r};s[i]=Promise.all(n.map(e=>o[e]||r(e))).then(e=>(t(...e),c))}}define(["./workbox-4754cb34"],function(e){"use strict";importScripts(),self.skipWaiting(),e.clientsClaim(),e.precacheAndRoute([{url:"/_next/app-build-manifest.json",revision:"45785962022fa815a37500bab849d19f"},{url:"/_next/static/chunks/23-5f57ebc5726ffc61.js",revision:"zNnk3UR-Ga0Xj-5aO0Ak_"},{url:"/_next/static/chunks/372-42f5e7ca7c272cac.js",revision:"zNnk3UR-Ga0Xj-5aO0Ak_"},{url:"/_next/static/chunks/530-0d57a54f2c7509b6.js",revision:"zNnk3UR-Ga0Xj-5aO0Ak_"},{url:"/_next/static/chunks/app/(auth)/login/page-3e94906176f44c83.js",revision:"zNnk3UR-Ga0Xj-5aO0Ak_"},{url:"/_next/static/chunks/app/(protected)/attendance/page-b9d81e147d2ed202.js",revision:"zNnk3UR-Ga0Xj-5aO0Ak_"},{url:"/_next/static/chunks/app/(protected)/calls/page-f5a78fba3087101b.js",revision:"zNnk3UR-Ga0Xj-5aO0Ak_"},{url:"/_next/static/chunks/app/(protected)/dashboard/page-bb408e23b9ce4352.js",revision:"zNnk3UR-Ga0Xj-5aO0Ak_"},{url:"/_next/static/chunks/app/(protected)/debts/page-f6dac2ab50bf9ce7.js",revision:"zNnk3UR-Ga0Xj-5aO0Ak_"},{url:"/_next/static/chunks/app/(protected)/lost/page-cafc8e6db7258096.js",revision:"zNnk3UR-Ga0Xj-5aO0Ak_"},{url:"/_next/static/chunks/app/(protected)/messages/page-983a611f700e62f9.js",revision:"zNnk3UR-Ga0Xj-5aO0Ak_"},{url:"/_next/static/chunks/app/(protected)/notices/page-36f4ea61c64db787.js",revision:"zNnk3UR-Ga0Xj-5aO0Ak_"},{url:"/_next/static/chunks/app/(protected)/rankings/page-e434433c434b928b.js",revision:"zNnk3UR-Ga0Xj-5aO0Ak_"},{url:"/_next/static/chunks/app/(protected)/schedule/page-57967200779bf439.js",revision:"zNnk3UR-Ga0Xj-5aO0Ak_"},{url:"/_next/static/chunks/app/(protected)/stores/page-b8ef6098c46e5ae0.js",revision:"zNnk3UR-Ga0Xj-5aO0Ak_"},{url:"/_next/static/chunks/app/(protected)/users/page-1361e056eb605bc4.js",revision:"zNnk3UR-Ga0Xj-5aO0Ak_"},{url:"/_next/static/chunks/app/_not-found/page-eadc29731652ae7d.js",revision:"zNnk3UR-Ga0Xj-5aO0Ak_"},{url:"/_next/static/chunks/app/layout-4bed0718f643ecd2.js",revision:"zNnk3UR-Ga0Xj-5aO0Ak_"},{url:"/_next/static/chunks/app/not-found-b138f2aa7719a744.js",revision:"zNnk3UR-Ga0Xj-5aO0Ak_"},{url:"/_next/static/chunks/app/page-0d72f853310edfbe.js",revision:"zNnk3UR-Ga0Xj-5aO0Ak_"},{url:"/_next/static/chunks/fd9d1056-caee44a3a7c983d7.js",revision:"zNnk3UR-Ga0Xj-5aO0Ak_"},{url:"/_next/static/chunks/framework-b370f160bb96059c.js",revision:"zNnk3UR-Ga0Xj-5aO0Ak_"},{url:"/_next/static/chunks/main-app-6c1f316c9733cb48.js",revision:"zNnk3UR-Ga0Xj-5aO0Ak_"},{url:"/_next/static/chunks/main-bf7b10ac7dfff029.js",revision:"zNnk3UR-Ga0Xj-5aO0Ak_"},{url:"/_next/static/chunks/pages/_app-14e24e5cf3e67df6.js",revision:"zNnk3UR-Ga0Xj-5aO0Ak_"},{url:"/_next/static/chunks/pages/_error-690b0695cc76fb9a.js",revision:"zNnk3UR-Ga0Xj-5aO0Ak_"},{url:"/_next/static/chunks/polyfills-78c92fac7aa8fdd8.js",revision:"79330112775102f91e1010318bae2bd3"},{url:"/_next/static/chunks/webpack-1214e4bd8911037e.js",revision:"zNnk3UR-Ga0Xj-5aO0Ak_"},{url:"/_next/static/css/a6908624278bd06f.css",revision:"a6908624278bd06f"},{url:"/_next/static/zNnk3UR-Ga0Xj-5aO0Ak_/_buildManifest.js",revision:"2db0cc40bc8d7b268d9443563b42b8f6"},{url:"/_next/static/zNnk3UR-Ga0Xj-5aO0Ak_/_ssgManifest.js",revision:"b6652df95db52feb4daf4eca35380933"},{url:"/icons/icon-192.png",revision:"eee0d0e02ea1042f7296a6f1860eeb63"},{url:"/icons/icon-512.png",revision:"8676b45988953d59525c2e5b50b29b2d"},{url:"/manifest.json",revision:"22e1c316b1bfd83f4b12fc356fa63899"}],{ignoreURLParametersMatching:[]}),e.cleanupOutdatedCaches(),e.registerRoute("/",new e.NetworkFirst({cacheName:"start-url",plugins:[{cacheWillUpdate:async({request:e,response:s,event:a,state:n})=>s&&"opaqueredirect"===s.type?new Response(s.body,{status:200,statusText:"OK",headers:s.headers}):s}]}),"GET"),e.registerRoute(/^https:\/\/fonts\.(?:gstatic)\.com\/.*/i,new e.CacheFirst({cacheName:"google-fonts-webfonts",plugins:[new e.ExpirationPlugin({maxEntries:4,maxAgeSeconds:31536e3})]}),"GET"),e.registerRoute(/^https:\/\/fonts\.(?:googleapis)\.com\/.*/i,new e.StaleWhileRevalidate({cacheName:"google-fonts-stylesheets",plugins:[new e.ExpirationPlugin({maxEntries:4,maxAgeSeconds:604800})]}),"GET"),e.registerRoute(/\.(?:eot|otf|ttc|ttf|woff|woff2|font.css)$/i,new e.StaleWhileRevalidate({cacheName:"static-font-assets",plugins:[new e.ExpirationPlugin({maxEntries:4,maxAgeSeconds:604800})]}),"GET"),e.registerRoute(/\.(?:jpg|jpeg|gif|png|svg|ico|webp)$/i,new e.StaleWhileRevalidate({cacheName:"static-image-assets",plugins:[new e.ExpirationPlugin({maxEntries:64,maxAgeSeconds:86400})]}),"GET"),e.registerRoute(/\/_next\/image\?url=.+$/i,new e.StaleWhileRevalidate({cacheName:"next-image",plugins:[new e.ExpirationPlugin({maxEntries:64,maxAgeSeconds:86400})]}),"GET"),e.registerRoute(/\.(?:mp3|wav|ogg)$/i,new e.CacheFirst({cacheName:"static-audio-assets",plugins:[new e.RangeRequestsPlugin,new e.ExpirationPlugin({maxEntries:32,maxAgeSeconds:86400})]}),"GET"),e.registerRoute(/\.(?:mp4)$/i,new e.CacheFirst({cacheName:"static-video-assets",plugins:[new e.RangeRequestsPlugin,new e.ExpirationPlugin({maxEntries:32,maxAgeSeconds:86400})]}),"GET"),e.registerRoute(/\.(?:js)$/i,new e.StaleWhileRevalidate({cacheName:"static-js-assets",plugins:[new e.ExpirationPlugin({maxEntries:32,maxAgeSeconds:86400})]}),"GET"),e.registerRoute(/\.(?:css|less)$/i,new e.StaleWhileRevalidate({cacheName:"static-style-assets",plugins:[new e.ExpirationPlugin({maxEntries:32,maxAgeSeconds:86400})]}),"GET"),e.registerRoute(/\/_next\/data\/.+\/.+\.json$/i,new e.StaleWhileRevalidate({cacheName:"next-data",plugins:[new e.ExpirationPlugin({maxEntries:32,maxAgeSeconds:86400})]}),"GET"),e.registerRoute(/\.(?:json|xml|csv)$/i,new e.NetworkFirst({cacheName:"static-data-assets",plugins:[new e.ExpirationPlugin({maxEntries:32,maxAgeSeconds:86400})]}),"GET"),e.registerRoute(({url:e})=>{if(!(self.origin===e.origin))return!1;const s=e.pathname;return!s.startsWith("/api/auth/")&&!!s.startsWith("/api/")},new e.NetworkFirst({cacheName:"apis",networkTimeoutSeconds:10,plugins:[new e.ExpirationPlugin({maxEntries:16,maxAgeSeconds:86400})]}),"GET"),e.registerRoute(({url:e})=>{if(!(self.origin===e.origin))return!1;return!e.pathname.startsWith("/api/")},new e.NetworkFirst({cacheName:"others",networkTimeoutSeconds:10,plugins:[new e.ExpirationPlugin({maxEntries:32,maxAgeSeconds:86400})]}),"GET"),e.registerRoute(({url:e})=>!(self.origin===e.origin),new e.NetworkFirst({cacheName:"cross-origin",networkTimeoutSeconds:10,plugins:[new e.ExpirationPlugin({maxEntries:32,maxAgeSeconds:3600})]}),"GET")});
+if(!self.define){let e,s={};const n=(n,t)=>(n=new URL(n+".js",t).href,s[n]||new Promise(s=>{if("document"in self){const e=document.createElement("script");e.src=n,e.onload=s,document.head.appendChild(e)}else e=n,importScripts(n),s()}).then(()=>{let e=s[n];if(!e)throw new Error(`Module ${n} didn’t register its module`);return e}));self.define=(t,a)=>{const i=e||("document"in self?document.currentScript.src:"")||location.href;if(s[i])return;let c={};const o=e=>n(e,i),r={module:{uri:i},exports:c,require:o};s[i]=Promise.all(t.map(e=>r[e]||o(e))).then(e=>(a(...e),c))}}define(["./workbox-4754cb34"],function(e){"use strict";importScripts(),self.skipWaiting(),e.clientsClaim(),e.precacheAndRoute([{url:"/_next/app-build-manifest.json",revision:"c7297969e0e3a5e5f8eff068c1085e58"},{url:"/_next/static/XPGw-WTE2VHRngo1XRHwQ/_buildManifest.js",revision:"2db0cc40bc8d7b268d9443563b42b8f6"},{url:"/_next/static/XPGw-WTE2VHRngo1XRHwQ/_ssgManifest.js",revision:"b6652df95db52feb4daf4eca35380933"},{url:"/_next/static/chunks/23-5f57ebc5726ffc61.js",revision:"XPGw-WTE2VHRngo1XRHwQ"},{url:"/_next/static/chunks/433-d5639abf87c01419.js",revision:"XPGw-WTE2VHRngo1XRHwQ"},{url:"/_next/static/chunks/530-0d57a54f2c7509b6.js",revision:"XPGw-WTE2VHRngo1XRHwQ"},{url:"/_next/static/chunks/app/(auth)/login/page-3e94906176f44c83.js",revision:"XPGw-WTE2VHRngo1XRHwQ"},{url:"/_next/static/chunks/app/(protected)/attendance/page-9575995b4b480c0a.js",revision:"XPGw-WTE2VHRngo1XRHwQ"},{url:"/_next/static/chunks/app/(protected)/calls/page-8e244f724425680b.js",revision:"XPGw-WTE2VHRngo1XRHwQ"},{url:"/_next/static/chunks/app/(protected)/dashboard/page-e930dae3df8964f6.js",revision:"XPGw-WTE2VHRngo1XRHwQ"},{url:"/_next/static/chunks/app/(protected)/debts/page-4903373cd0d4990a.js",revision:"XPGw-WTE2VHRngo1XRHwQ"},{url:"/_next/static/chunks/app/(protected)/lost/page-fd0ab59d40b92cfd.js",revision:"XPGw-WTE2VHRngo1XRHwQ"},{url:"/_next/static/chunks/app/(protected)/messages/page-35b6354d495b6245.js",revision:"XPGw-WTE2VHRngo1XRHwQ"},{url:"/_next/static/chunks/app/(protected)/notices/page-dabd4d34d7083575.js",revision:"XPGw-WTE2VHRngo1XRHwQ"},{url:"/_next/static/chunks/app/(protected)/rankings/page-50275d91ae4eb24a.js",revision:"XPGw-WTE2VHRngo1XRHwQ"},{url:"/_next/static/chunks/app/(protected)/sales/page-2b356c4e807644f5.js",revision:"XPGw-WTE2VHRngo1XRHwQ"},{url:"/_next/static/chunks/app/(protected)/schedule/page-68c2683942486deb.js",revision:"XPGw-WTE2VHRngo1XRHwQ"},{url:"/_next/static/chunks/app/(protected)/stores/page-6d776bf8a94aed00.js",revision:"XPGw-WTE2VHRngo1XRHwQ"},{url:"/_next/static/chunks/app/(protected)/users/page-31138e3658504277.js",revision:"XPGw-WTE2VHRngo1XRHwQ"},{url:"/_next/static/chunks/app/_not-found/page-eadc29731652ae7d.js",revision:"XPGw-WTE2VHRngo1XRHwQ"},{url:"/_next/static/chunks/app/layout-452cd66250f06983.js",revision:"XPGw-WTE2VHRngo1XRHwQ"},{url:"/_next/static/chunks/app/not-found-b138f2aa7719a744.js",revision:"XPGw-WTE2VHRngo1XRHwQ"},{url:"/_next/static/chunks/app/page-0d72f853310edfbe.js",revision:"XPGw-WTE2VHRngo1XRHwQ"},{url:"/_next/static/chunks/fd9d1056-caee44a3a7c983d7.js",revision:"XPGw-WTE2VHRngo1XRHwQ"},{url:"/_next/static/chunks/framework-b370f160bb96059c.js",revision:"XPGw-WTE2VHRngo1XRHwQ"},{url:"/_next/static/chunks/main-57c436b3e7cf88ec.js",revision:"XPGw-WTE2VHRngo1XRHwQ"},{url:"/_next/static/chunks/main-app-6c1f316c9733cb48.js",revision:"XPGw-WTE2VHRngo1XRHwQ"},{url:"/_next/static/chunks/pages/_app-14e24e5cf3e67df6.js",revision:"XPGw-WTE2VHRngo1XRHwQ"},{url:"/_next/static/chunks/pages/_error-690b0695cc76fb9a.js",revision:"XPGw-WTE2VHRngo1XRHwQ"},{url:"/_next/static/chunks/polyfills-78c92fac7aa8fdd8.js",revision:"79330112775102f91e1010318bae2bd3"},{url:"/_next/static/chunks/webpack-1214e4bd8911037e.js",revision:"XPGw-WTE2VHRngo1XRHwQ"},{url:"/_next/static/css/7552c2ea8c04ea82.css",revision:"7552c2ea8c04ea82"},{url:"/icons/icon-192.png",revision:"eee0d0e02ea1042f7296a6f1860eeb63"},{url:"/icons/icon-512.png",revision:"8676b45988953d59525c2e5b50b29b2d"},{url:"/manifest.json",revision:"22e1c316b1bfd83f4b12fc356fa63899"}],{ignoreURLParametersMatching:[]}),e.cleanupOutdatedCaches(),e.registerRoute("/",new e.NetworkFirst({cacheName:"start-url",plugins:[{cacheWillUpdate:async({request:e,response:s,event:n,state:t})=>s&&"opaqueredirect"===s.type?new Response(s.body,{status:200,statusText:"OK",headers:s.headers}):s}]}),"GET"),e.registerRoute(/^https:\/\/fonts\.(?:gstatic)\.com\/.*/i,new e.CacheFirst({cacheName:"google-fonts-webfonts",plugins:[new e.ExpirationPlugin({maxEntries:4,maxAgeSeconds:31536e3})]}),"GET"),e.registerRoute(/^https:\/\/fonts\.(?:googleapis)\.com\/.*/i,new e.StaleWhileRevalidate({cacheName:"google-fonts-stylesheets",plugins:[new e.ExpirationPlugin({maxEntries:4,maxAgeSeconds:604800})]}),"GET"),e.registerRoute(/\.(?:eot|otf|ttc|ttf|woff|woff2|font.css)$/i,new e.StaleWhileRevalidate({cacheName:"static-font-assets",plugins:[new e.ExpirationPlugin({maxEntries:4,maxAgeSeconds:604800})]}),"GET"),e.registerRoute(/\.(?:jpg|jpeg|gif|png|svg|ico|webp)$/i,new e.StaleWhileRevalidate({cacheName:"static-image-assets",plugins:[new e.ExpirationPlugin({maxEntries:64,maxAgeSeconds:86400})]}),"GET"),e.registerRoute(/\/_next\/image\?url=.+$/i,new e.StaleWhileRevalidate({cacheName:"next-image",plugins:[new e.ExpirationPlugin({maxEntries:64,maxAgeSeconds:86400})]}),"GET"),e.registerRoute(/\.(?:mp3|wav|ogg)$/i,new e.CacheFirst({cacheName:"static-audio-assets",plugins:[new e.RangeRequestsPlugin,new e.ExpirationPlugin({maxEntries:32,maxAgeSeconds:86400})]}),"GET"),e.registerRoute(/\.(?:mp4)$/i,new e.CacheFirst({cacheName:"static-video-assets",plugins:[new e.RangeRequestsPlugin,new e.ExpirationPlugin({maxEntries:32,maxAgeSeconds:86400})]}),"GET"),e.registerRoute(/\.(?:js)$/i,new e.StaleWhileRevalidate({cacheName:"static-js-assets",plugins:[new e.ExpirationPlugin({maxEntries:32,maxAgeSeconds:86400})]}),"GET"),e.registerRoute(/\.(?:css|less)$/i,new e.StaleWhileRevalidate({cacheName:"static-style-assets",plugins:[new e.ExpirationPlugin({maxEntries:32,maxAgeSeconds:86400})]}),"GET"),e.registerRoute(/\/_next\/data\/.+\/.+\.json$/i,new e.StaleWhileRevalidate({cacheName:"next-data",plugins:[new e.ExpirationPlugin({maxEntries:32,maxAgeSeconds:86400})]}),"GET"),e.registerRoute(/\.(?:json|xml|csv)$/i,new e.NetworkFirst({cacheName:"static-data-assets",plugins:[new e.ExpirationPlugin({maxEntries:32,maxAgeSeconds:86400})]}),"GET"),e.registerRoute(({url:e})=>{if(!(self.origin===e.origin))return!1;const s=e.pathname;return!s.startsWith("/api/auth/")&&!!s.startsWith("/api/")},new e.NetworkFirst({cacheName:"apis",networkTimeoutSeconds:10,plugins:[new e.ExpirationPlugin({maxEntries:16,maxAgeSeconds:86400})]}),"GET"),e.registerRoute(({url:e})=>{if(!(self.origin===e.origin))return!1;return!e.pathname.startsWith("/api/")},new e.NetworkFirst({cacheName:"others",networkTimeoutSeconds:10,plugins:[new e.ExpirationPlugin({maxEntries:32,maxAgeSeconds:86400})]}),"GET"),e.registerRoute(({url:e})=>!(self.origin===e.origin),new e.NetworkFirst({cacheName:"cross-origin",networkTimeoutSeconds:10,plugins:[new e.ExpirationPlugin({maxEntries:32,maxAgeSeconds:3600})]}),"GET")});
 
 ```
 
@@ -8201,48 +8202,30 @@ export default function LoginPage() {
 ```
 'use client';
 
-/**
- * 1-1 Attendance (API-first, LocalStorage fallback)
- * - DB 스키마: attendance(id: bigint, user_id: bigint, store_id: uuid, check_in_at: timestamptz, check_out_at: timestamptz, total_hours numeric, work_date date)
- * - API:
- *   GET  /api/attendance?role=staff|manager|super_admin&userId=&managerId=&dateFrom=YYYY-MM-DD&dateTo=YYYY-MM-DD
- *   POST /api/attendance   { userId:number, storeId:string(uuid) }
- *   PATCH /api/attendance  { id:number }   // 체크아웃
- */
-
 import React from 'react';
 import ClientGuard from '@/middleware/client-guard';
 import PageWrap from '@/components/PageWrap';
 import { useAuth } from '@/lib/auth';
-import { LS_KEYS, load, save, todayStr } from '@/lib/storage';
+import { LS_KEYS, load, todayStr } from '@/lib/storage';
 
-// ---- 유틸
 const fmt = (v?: string | null) => {
   if (!v) return '-';
   const d = new Date(v);
   return isNaN(d.getTime()) ? '-' : d.toLocaleString();
 };
 
-
-type Store = { id: string; name: string } | { id: number; name: string } | any;
+type Store = { id: string; name: string } | any;
 type AttRow = {
-  id: number;               // bigint
+  id: number;
   user_id: number;
-  store_id: string;         // uuid
+  store_id: string;
   check_in_at: string | null;
   check_out_at: string | null;
   total_hours?: number | null;
   work_date?: string | null;
 };
 
-const todayKSTStr = () => {
-  const now = new Date();
-  const kst = new Date(now.getTime() + 9 * 60 * 60 * 1000);
-  return kst.toISOString().slice(0, 10); // YYYY-MM-DD
-};
-
-// 기존: const TODAY = todayStr();
-const TODAY = todayKSTStr();
+const TODAY = todayStr();
 
 export default function AttendancePage() {
   const { user } = useAuth();
@@ -8253,25 +8236,23 @@ export default function AttendancePage() {
   const [workingRowId, setWorkingRowId] = React.useState<number | null>(null);
   const [err, setErr] = React.useState<string>('');
 
-  // ---- 스토어 로드 (API → 실패 시 LS)
+  // 스토어 로드 (API → 실패 시 LS)
   const loadStores = React.useCallback(async () => {
     try {
-      const res = await fetch('/api/stores');
+      const res = await fetch('/api/stores', { cache: 'no-store' });
       if (!res.ok) throw new Error('stores api failed');
       const json = await res.json();
-      const list = json?.rows || json || [];
+      const list = (json?.rows || json || []).map((s: any) => ({ id: String(s.id), name: s.name }));
       setStores(list);
-      // uuid 문자열(or 숫자) 모두 대응
-      const firstId = (list[0]?.id ?? '') + '';
-      setCurrentStoreId(firstId);
+      setCurrentStoreId(list[0]?.id || '');
     } catch {
-      const ls = (load<any[]>(LS_KEYS.stores) || []).map(s => ({ id: (s.id + ''), name: s.name }));
+      const ls = (load<any[]>(LS_KEYS.stores) || []).map(s => ({ id: String(s.id), name: s.name }));
       setStores(ls);
       setCurrentStoreId(ls[0]?.id || '');
     }
   }, []);
 
-  // ---- 출퇴근 로드 (역할별, 오늘 범위)
+  // 출퇴근 로드 (역할별, 오늘 날짜)
   const loadAttendance = React.useCallback(async () => {
     if (!user) return;
     setLoading(true);
@@ -8285,29 +8266,16 @@ export default function AttendancePage() {
       qs.set('dateFrom', TODAY);
       qs.set('dateTo', TODAY);
 
-      const res = await fetch(`/api/attendance?${qs.toString()}`);
-      if (!res.ok) throw new Error(await res.text());
+      const res = await fetch(`/api/attendance?${qs.toString()}`, { cache: 'no-store' });
       const json = await res.json();
+      if (!res.ok) throw new Error(json?.error || 'load failed');
+
       const list: AttRow[] = json?.rows || [];
       setRows(list);
-
-      // "근무중" 행 찾기: 내 user_id && check_out_at가 null
       const open = list.find(r => r.user_id === user.id && !r.check_out_at);
       setWorkingRowId(open?.id ?? null);
     } catch (e: any) {
-      // API 실패 시 LS로 폴백 (데모/오프라인)
-      const ls = (load<any[]>(LS_KEYS.attendance) || []).map((r: any) => ({
-        id: Number(r.id) || 0,
-        user_id: Number(r.userId),
-        store_id: (r.storeId + ''),
-        check_in_at: r.checkIn || null,
-        check_out_at: r.checkOut || null,
-        total_hours: r.totalHours ?? 0,
-      })) as AttRow[];
-      setRows(ls);
-      const open = ls.find(r => r.user_id === user?.id && !r.check_out_at);
-      setWorkingRowId(open?.id ?? null);
-      setErr('API 실패로 로컬 데이터로 표시 중입니다.');
+      setErr(e?.message || 'API 실패');
     } finally {
       setLoading(false);
     }
@@ -8316,43 +8284,29 @@ export default function AttendancePage() {
   React.useEffect(() => { loadStores(); }, [loadStores]);
   React.useEffect(() => { loadAttendance(); }, [loadAttendance]);
 
-  // ---- 체크인
+  // 체크인
   const onCheckIn = async () => {
     if (!user) return;
     if (!currentStoreId) return alert('가게를 선택하세요.');
     if (workingRowId) return alert('이미 출근 상태입니다.');
 
-    // API 우선
     try {
       const res = await fetch('/api/attendance', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ userId: user.id, storeId: currentStoreId })
+        body: JSON.stringify({ userId: user.id, storeId: currentStoreId }) // uuid면 문자열 그대로
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json?.error || '체크인 실패');
-
-      // 성공 후 목록 갱신
       await loadAttendance();
-      return;
     } catch (e: any) {
-      // 폴백: LS
-      const prev = load<any[]>(LS_KEYS.attendance) || [];
-      const rec = {
-        id: Date.now(), userId: user.id, storeId: currentStoreId,
-        checkIn: new Date().toISOString(), checkOut: null, totalHours: 0
-      };
-      const next = [rec, ...prev];
-      save(LS_KEYS.attendance, next);
-      await loadAttendance();
-      alert('(폴백) 로컬 출근 처리되었습니다.');
+      alert(e?.message || '체크인 실패');
     }
   };
 
-  // ---- 체크아웃
+  // 체크아웃
   const onCheckOut = async () => {
     if (!workingRowId) return alert('출근 상태가 아닙니다.');
-
     try {
       const res = await fetch('/api/attendance', {
         method: 'PATCH',
@@ -8363,23 +8317,10 @@ export default function AttendancePage() {
       if (!res.ok) throw new Error(json?.error || '체크아웃 실패');
       await loadAttendance();
     } catch (e: any) {
-      // 폴백: LS
-      const prev = load<any[]>(LS_KEYS.attendance) || [];
-      const next = prev.map((r: any) => {
-        if (Number(r.id) === Number(workingRowId)) {
-          const out = new Date();
-          const hours = Math.max(0, (out.getTime() - new Date(r.checkIn).getTime()) / 36e5);
-          return { ...r, checkOut: out.toISOString(), totalHours: Number(hours.toFixed(2)) };
-        }
-        return r;
-      });
-      save(LS_KEYS.attendance, next);
-      await loadAttendance();
-      alert('(폴백) 로컬 체크아웃 처리되었습니다.');
+      alert(e?.message || '체크아웃 실패');
     }
   };
 
-  // ---- 내 레코드만, 최근 50
   const myRows = rows.filter(r => r.user_id === user?.id).slice(0, 50);
 
   return (
@@ -8391,26 +8332,18 @@ export default function AttendancePage() {
           <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
             <select
               value={currentStoreId}
-              onChange={e => setCurrentStoreId(e.target.value)}
+              onChange={e => setCurrentStoreId(e.target.value)} // 문자열 그대로
               className="rounded-xl border-slate-300"
             >
               {stores.map((s: any) => (
-                <option key={String(s.id)} value={String(s.id)}>
-                  {s.name}
-                </option>
+                <option key={String(s.id)} value={String(s.id)}>{s.name}</option>
               ))}
             </select>
             <div className="flex gap-2">
-              <button onClick={onCheckIn} className="px-4 py-2 rounded-xl bg-brand-600 text-white hover:bg-brand-700 disabled:opacity-50" disabled={loading}>
-                출근
-              </button>
-              <button onClick={onCheckOut} className="px-4 py-2 rounded-xl bg-slate-900 text-white hover:bg-slate-700 disabled:opacity-50" disabled={loading}>
-                퇴근
-              </button>
+              <button onClick={onCheckIn} className="px-4 py-2 rounded-xl bg-brand-600 text-white hover:bg-brand-700" disabled={loading}>출근</button>
+              <button onClick={onCheckOut} className="px-4 py-2 rounded-xl bg-slate-900 text-white hover:bg-slate-700" disabled={loading}>퇴근</button>
             </div>
-            <div className="text-sm text-slate-500">
-              상태: {workingRowId ? '근무중' : '대기'}
-            </div>
+            <div className="text-sm text-slate-500">상태: {workingRowId ? '근무중' : '대기'}</div>
             {err && <div className="text-xs text-amber-600">{err}</div>}
           </div>
         </div>
@@ -8429,8 +8362,7 @@ export default function AttendancePage() {
               </thead>
               <tbody>
                 {myRows.map(r => {
-                  const storeName =
-                    stores.find((s: any) => String(s.id) === String(r.store_id))?.name || '-';
+                  const storeName = stores.find((s: any) => String(s.id) === String(r.store_id))?.name || '-';
                   return (
                     <tr key={r.id} className="border-t">
                       <td className="p-3">{storeName}</td>
@@ -8441,9 +8373,7 @@ export default function AttendancePage() {
                   );
                 })}
                 {myRows.length === 0 && (
-                  <tr>
-                    <td colSpan={4} className="p-4 text-slate-500">기록이 없습니다.</td>
-                  </tr>
+                  <tr><td colSpan={4} className="p-4 text-slate-500">기록이 없습니다.</td></tr>
                 )}
               </tbody>
             </table>
@@ -8458,93 +8388,429 @@ export default function AttendancePage() {
 ===== FILE: src\app\(protected)\calls\page.tsx =====
 
 ```
-// 4-1 호출 — 카드/버튼 유틸 적용
 'use client';
+
 import React from 'react';
 import ClientGuard from '@/middleware/client-guard';
 import PageWrap from '@/components/PageWrap';
 import { useAuth } from '@/lib/auth';
 import { LS_KEYS, load, save, genId } from '@/lib/storage';
+import { PhoneCall, Plus, Check, X, Search, Filter, Store } from 'lucide-react';
 
+/** =========================
+ * Types & helpers
+ * ======================= */
+type CallStatus = 'pending' | 'approved' | 'rejected';
+type CallRow = {
+  id: number;
+  staffId: number;
+  managerId: number | null;
+  storeId: number | string;
+  when: string;             // ISO
+  status: CallStatus;
+  requestedAt: string;      // ISO
+};
+
+const fmt = (iso?: string) => {
+  if (!iso) return '-';
+  const d = new Date(iso);
+  return isNaN(d.getTime()) ? '-' : d.toLocaleString();
+};
+
+// 브라우저 로컬 기준 현재 시각을 30분 단위로 반올림해서 datetime-local 포맷으로
+const nowRoundedLocal = () => {
+  const d = new Date();
+  const mins = d.getMinutes();
+  const rounded = Math.ceil(mins / 30) * 30;
+  if (rounded === 60) {
+    d.setHours(d.getHours() + 1);
+    d.setMinutes(0);
+  } else {
+    d.setMinutes(rounded);
+  }
+  d.setSeconds(0);
+  d.setMilliseconds(0);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  // yyyy-MM-ddTHH:mm
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+};
+
+const isoFromLocal = (val: string) => {
+  // input[type="datetime-local"] 값 → ISO
+  try {
+    if (!val) return '';
+    const d = new Date(val);
+    return d.toISOString();
+  } catch {
+    return '';
+  }
+};
+
+/** =========================
+ * Modal shell
+ * ======================= */
+function Modal({
+  open,
+  title,
+  onClose,
+  children,
+}: {
+  open: boolean;
+  title?: string;
+  onClose: () => void;
+  children: React.ReactNode;
+}) {
+  if (!open) return null;
+  return (
+    <div className="fixed inset-0 z-50">
+      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
+      <div className="absolute left-1/2 top-1/2 w-[92vw] max-w-lg -translate-x-1/2 -translate-y-1/2">
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-soft overflow-hidden">
+          {title && (
+            <div className="px-4 py-3 border-b bg-slate-50 flex items-center gap-2">
+              <PhoneCall size={16} className="text-slate-700" />
+              <div className="text-sm font-semibold">{title}</div>
+            </div>
+          )}
+          <div className="p-4">{children}</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** =========================
+ * New request form (staff)
+ * ======================= */
+function RequestForm({
+  stores,
+  defaultStoreId,
+  submitting,
+  onSubmit,
+}: {
+  stores: any[];
+  defaultStoreId?: number | string;
+  submitting?: boolean;
+  onSubmit: (v: { storeId: number | string; whenISO: string }) => void;
+}) {
+  const [storeId, setStoreId] = React.useState<number | string>(
+    defaultStoreId ?? (stores[0]?.id ?? '')
+  );
+  const [when, setWhen] = React.useState<string>(nowRoundedLocal());
+
+  // 모달이 열릴 때마다 기본값을 최신으로 갱신하고 싶다면 아래 노출된 effect를
+  // 부모에서 key 리셋으로 처리하므로 여기서는 유지하지 않아도 됩니다.
+
+  return (
+    <form
+      className="space-y-3"
+      onSubmit={(e) => {
+        e.preventDefault();
+        const whenISO = isoFromLocal(when);
+        if (!storeId) return alert('가게를 선택하세요.');
+        if (!whenISO) return alert('시간을 올바르게 선택하세요.');
+        onSubmit({ storeId, whenISO });
+      }}
+    >
+      <div>
+        <label className="block text-xs text-slate-500 mb-1">가게</label>
+        <select
+          className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-200"
+          value={storeId as any}
+          onChange={(e) => setStoreId(Number(e.target.value))}
+        >
+          {stores.map((s: any) => (
+            <option key={s.id} value={s.id}>
+              {s.name}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <div>
+        <label className="block text-xs text-slate-500 mb-1">예약 시간</label>
+        <input
+          type="datetime-local"
+          value={when}
+          onChange={(e) => setWhen(e.target.value)}
+          className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-200"
+        />
+        <div className="mt-1 text-[11px] text-slate-500">
+          현재 시각 기준으로 자동 설정됩니다. 필요하면 변경하세요.
+        </div>
+      </div>
+
+      <div className="pt-2 flex justify-end">
+        <button
+          disabled={submitting}
+          className="inline-flex items-center gap-2 rounded-xl bg-slate-900 hover:bg-slate-700 text-white text-sm font-medium px-4 py-2.5 disabled:opacity-60"
+        >
+          <Plus size={16} />
+          호출 요청
+        </button>
+      </div>
+    </form>
+  );
+}
+
+/** =========================
+ * Main Page
+ * ======================= */
 export default function CallsPage() {
   const { user } = useAuth();
+
+  // 데이터 소스
   const stores = load<any[]>(LS_KEYS.stores) || [];
   const users = load<any[]>(LS_KEYS.users) || [];
-  const [list, setList] = React.useState<any[]>(() => load(LS_KEYS.calls) || []);
+  const [list, setList] = React.useState<CallRow[]>(
+    () => load<CallRow[]>(LS_KEYS.calls) || []
+  );
 
-  const staffManagerId = (u:any) => (u.role==='staff' ? (u.managerId||2) : null);
-  const [reqForm, setReqForm] = React.useState({ storeId: stores[0]?.id||'', time: '' });
+  // UI 상태
+  const [q, setQ] = React.useState('');
+  const [status, setStatus] = React.useState<'all' | CallStatus>('all');
 
-  const createRequest = () => {
-    if (user?.role !== 'staff') return alert('직원만 호출을 생성할 수 있습니다.');
-    if (!reqForm.time) return alert('시간을 선택하세요.');
-    const rec = { staffId: user?.id, managerId: staffManagerId(user)||2, storeId: Number(reqForm.storeId), when: reqForm.time, status: 'pending', requestedAt: new Date().toISOString(), id: genId() };
-    const next = [rec, ...list];
-    save(LS_KEYS.calls, next); setList(next);
+  // 모달
+  const [openNew, setOpenNew] = React.useState(false);
+  // 모달 내부 폼을 새로 열 때마다 기본 시간(nowRoundedLocal)로 초기화하도록 key 변경
+  const [modalKey, setModalKey] = React.useState(0);
+
+  // 역할 기반 뷰 제한
+  const myManagerId = React.useMemo(
+    () => (user?.role === 'staff' ? (user?.managerId || null) : null),
+    [user]
+  );
+
+  // 목록 필터링/정렬: 직원 → 본인 요청만 / 매니저 → 자기 소속 직원 요청 / 총관리자 → 전체
+  const scoped = React.useMemo(() => {
+    if (!user) return [] as CallRow[];
+    let base = list;
+
+    if (user.role === 'staff') {
+      base = base.filter((c) => c.staffId === user.id);
+    } else if (user.role === 'manager') {
+      base = base.filter((c) => c.managerId === user.id);
+    }
+
+    const needle = q.trim().toLowerCase();
+    if (needle) {
+      base = base.filter((c) => {
+        const staff = users.find((u: any) => u.id === c.staffId);
+        const store = stores.find((s: any) => String(s.id) === String(c.storeId));
+        return (
+          (staff?.nickname || staff?.username || '').toLowerCase().includes(needle) ||
+          (store?.name || '').toLowerCase().includes(needle) ||
+          c.status.toLowerCase().includes(needle)
+        );
+      });
+    }
+
+    if (status !== 'all') {
+      base = base.filter((c) => c.status === status);
+    }
+
+    // 최신 요청 먼저
+    return base
+      .slice()
+      .sort((a, b) => (b.requestedAt || '').localeCompare(a.requestedAt || ''));
+  }, [list, user, users, stores, q, status]);
+
+  // 저장 헬퍼
+  const persist = (rows: CallRow[]) => {
+    save(LS_KEYS.calls, rows);
+    setList(rows);
   };
 
-  const setStatus = (id:number, status:'approved'|'rejected') => {
-    if (user?.role==='staff') return alert('권한이 없습니다.');
-    const next = list.map(c=> c.id===id ? { ...c, status } : c);
-    save(LS_KEYS.calls, next); setList(next);
+  // 생성: 직원만
+  const createRequest = (payload: { storeId: number | string; whenISO: string }) => {
+    if (!user || user.role !== 'staff') {
+      alert('직원만 호출을 생성할 수 있습니다.');
+      return;
+    }
+    const rec: CallRow = {
+      id: genId(),
+      staffId: user.id,
+      managerId: myManagerId ?? null,
+      storeId: payload.storeId,
+      when: payload.whenISO,
+      status: 'pending',
+      requestedAt: new Date().toISOString(),
+    };
+    const next = [rec, ...list];
+    persist(next);
+    setOpenNew(false);
+  };
+
+  // 상태 변경: 매니저/총관리자만
+  const setStatusRow = (id: number, nextStatus: CallStatus) => {
+    if (!user || user.role === 'staff') {
+      alert('권한이 없습니다.');
+      return;
+    }
+    const next = list.map((c) => (c.id === id ? { ...c, status: nextStatus } : c));
+    persist(next);
+  };
+
+  // 상태 뱃지
+  const Badge = ({ st }: { st: CallStatus }) => {
+    const color =
+      st === 'pending'
+        ? 'bg-amber-50 text-amber-700 border-amber-200'
+        : st === 'approved'
+        ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+        : 'bg-rose-50 text-rose-700 border-rose-200';
+    const label = st === 'pending' ? '대기' : st === 'approved' ? '승인' : '거절';
+    return (
+      <span className={`inline-flex items-center px-2 py-0.5 rounded-full border text-[11px] ${color}`}>
+        {label}
+      </span>
+    );
+  };
+
+  // 상태 필터 토글
+  const cycleStatus = () => {
+    setStatus((s) =>
+      s === 'all' ? 'pending' : s === 'pending' ? 'approved' : s === 'approved' ? 'rejected' : 'all'
+    );
   };
 
   return (
     <ClientGuard>
       <PageWrap>
-        <h2 className="text-xl font-semibold mb-4">호출</h2>
-
-        {user?.role==='staff' && (
-          <div className="card p-4 mb-6">
-            <div className="grid sm:grid-cols-3 gap-3">
-              <select value={reqForm.storeId as any} onChange={e=>setReqForm(f=>({...f, storeId:Number(e.target.value)}))} className="input">
-                {stores.map((s:any)=> <option key={s.id} value={s.id}>{s.name}</option>)}
-              </select>
-              <input type="datetime-local" value={reqForm.time} onChange={e=>setReqForm(f=>({...f, time:e.target.value}))} className="input" />
-              <button className="btn-subtle" onClick={createRequest}>호출 요청</button>
+        {/* 헤더 */}
+        <div className="flex flex-col gap-3 mb-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <PhoneCall className="text-slate-700" />
+              <h2 className="text-xl font-semibold">호출</h2>
             </div>
-          </div>
-        )}
 
-        <div className="table-wrap">
+            {user?.role === 'staff' && (
+              <button
+                onClick={() => {
+                  setModalKey((k) => k + 1);
+                  setOpenNew(true);
+                }}
+                className="inline-flex items-center gap-2 rounded-xl bg-slate-900 hover:bg-slate-700 text-white text-sm font-medium px-4 py-2.5"
+              >
+                <Plus size={16} />
+                호출 요청
+              </button>
+            )}
+          </div>
+
+          {/* 컨트롤 바: 모바일 가로 정렬 + 자동 줄바꿈 */}
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="relative">
+              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                placeholder="직원/가게/상태 검색"
+                className="w-[220px] max-w-[60vw] pl-9 pr-3 py-2 rounded-xl border border-slate-300 bg-white text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-200"
+              />
+            </div>
+
+            <button
+              className="inline-flex items-center gap-1.5 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-sm px-3 py-2"
+              onClick={cycleStatus}
+              title="상태 필터"
+            >
+              <Filter size={16} />
+              {status === 'all' ? '전체' : status === 'pending' ? '대기' : status === 'approved' ? '승인' : '거절'}
+            </button>
+            {/* 정렬 버튼은 제거(요청사항). 내부는 최신순 유지 */}
+          </div>
+        </div>
+
+        {/* 목록 */}
+        <div className="overflow-x-auto bg-white border border-slate-200 rounded-2xl">
           <table className="min-w-full text-sm">
             <thead className="bg-slate-50">
               <tr>
-                <th className="table-th">직원</th>
-                <th className="table-th">가게</th>
-                <th className="table-th">시간</th>
-                <th className="table-th">상태</th>
-                <th className="table-th">작업</th>
+                <th className="p-3 text-left">직원</th>
+                <th className="p-3 text-left">가게</th>
+                <th className="p-3 text-left">요청 시간</th>
+                <th className="p-3 text-left">예약 시간</th>
+                <th className="p-3 text-left">상태</th>
+                <th className="p-3 text-left">작업</th>
               </tr>
             </thead>
             <tbody>
-              {list.map((c:any)=>{
-                const staff = users.find((u:any)=>u.id===c.staffId);
-                const st = stores.find((s:any)=>s.id===c.storeId);
+              {scoped.map((c) => {
+                const staff = users.find((u: any) => u.id === c.staffId);
+                const store = stores.find((s: any) => String(s.id) === String(c.storeId));
                 return (
                   <tr key={c.id} className="border-t">
-                    <td className="table-td">{staff?.nickname||staff?.username}</td>
-                    <td className="table-td">{st?.name}</td>
-                    <td className="table-td">{new Date(c.when).toLocaleString()}</td>
-                    <td className="table-td">{c.status}</td>
-                    <td className="table-td flex gap-2">
-                      {(user?.role!=='staff') && (
-                        <>
-                          <button onClick={()=>setStatus(c.id,'approved')} className="btn-success px-3 py-1.5 text-xs">승인</button>
-                          <button onClick={()=>setStatus(c.id,'rejected')} className="btn-danger px-3 py-1.5 text-xs">거절</button>
-                        </>
+                    <td className="p-3">{staff?.nickname || staff?.username || c.staffId}</td>
+                    <td className="p-3">
+                      <div className="inline-flex items-center gap-1.5">
+                        <Store size={14} className="text-slate-400" />
+                        <span>{store?.name || '-'}</span>
+                      </div>
+                    </td>
+                    <td className="p-3">{fmt(c.requestedAt)}</td>
+                    <td className="p-3">{fmt(c.when)}</td>
+                    <td className="p-3">
+                      <Badge st={c.status} />
+                    </td>
+                    <td className="p-3">
+                      {user?.role !== 'staff' ? (
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => setStatusRow(c.id, 'approved')}
+                            className="px-2 py-1 rounded-lg bg-slate-900 text-white text-xs inline-flex items-center gap-1"
+                            title="승인"
+                          >
+                            <Check size={14} />
+                            승인
+                          </button>
+                          <button
+                            onClick={() => setStatusRow(c.id, 'rejected')}
+                            className="px-2 py-1 rounded-lg bg-red-600 text-white text-xs inline-flex items-center gap-1"
+                            title="거절"
+                          >
+                            <X size={14} />
+                            거절
+                          </button>
+                        </div>
+                      ) : (
+                        <span className="text-slate-400 text-xs">-</span>
                       )}
                     </td>
                   </tr>
                 );
               })}
+              {scoped.length === 0 && (
+                <tr>
+                  <td className="p-4 text-slate-500" colSpan={6}>
+                    표시할 호출이 없습니다.
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
+
+        {/* 신규 요청 모달 (직원 전용) — 제목을 '호출 요청'으로 */}
+        <Modal
+          open={openNew}
+          onClose={() => setOpenNew(false)}
+          title="호출 요청"
+        >
+          {/* key를 바꿔서 열 때마다 기본 시간(nowRoundedLocal) 리셋 */}
+          <RequestForm
+            key={modalKey}
+            stores={stores}
+            defaultStoreId={stores[0]?.id}
+            onSubmit={createRequest}
+          />
+        </Modal>
       </PageWrap>
     </ClientGuard>
   );
 }
+
 ```
 
 ===== FILE: src\app\(protected)\dashboard\page.tsx =====
@@ -8638,97 +8904,381 @@ export default function Dashboard() {
 ===== FILE: src\app\(protected)\debts\page.tsx =====
 
 ```
-// 5-1 미수금 — 카드/인풋/버튼 유틸 적용
 'use client';
+
 import React from 'react';
 import ClientGuard from '@/middleware/client-guard';
 import PageWrap from '@/components/PageWrap';
 import { useAuth } from '@/lib/auth';
 import { LS_KEYS, load, save, genId } from '@/lib/storage';
 
+type Debt = {
+  id: number;
+  userId: number;
+  storeId: string;    // 문자열 통일
+  amount: number;
+  note?: string;
+  createdAt?: string;
+};
+
+type User = { id: number; username: string; nickname?: string; role: string; managerId?: number };
+type Store = { id: string; name: string };
+
+const fmtMoney = (n: number) => (Number(n) || 0).toLocaleString();
+const includesQ = (s: string, q: string) => s.toLowerCase().includes(q.toLowerCase());
+
 export default function DebtsPage() {
   const { user } = useAuth();
-  if (user?.role==='staff') return (
-    <ClientGuard>
-      <PageWrap><div className="text-slate-600">권한이 없습니다.</div></PageWrap>
-    </ClientGuard>
+  if (!user) return (
+  <ClientGuard>
+    <PageWrap><div /></PageWrap>
+  </ClientGuard>
+);
+  if (user.role === 'staff') {
+    return (
+      <ClientGuard>
+        <PageWrap>
+          <h2 className="text-xl font-semibold mb-4">미수금 관리</h2>
+          <div className="text-slate-600">권한이 없습니다.</div>
+        </PageWrap>
+      </ClientGuard>
+    );
+  }
+
+  const rawUsers = (load<User[]>(LS_KEYS.users) || []) as User[];
+  const rawStores = (load<any[]>(LS_KEYS.stores) || []);
+  const stores: Store[] = rawStores.map((s) => ({ id: String(s.id), name: s.name }));
+
+  const [allDebts, setAllDebts] = React.useState<Debt[]>(
+    () => (load<Debt[]>(LS_KEYS.debts) || []).map((d) => ({ ...d, storeId: String(d.storeId) }))
   );
+  const [q, setQ] = React.useState('');
+  const [activeUserId, setActiveUserId] = React.useState<number | null>(null);
 
-  const users = load<any[]>(LS_KEYS.users) || [];
-  const stores = load<any[]>(LS_KEYS.stores) || [];
-  const [list, setList] = React.useState<any[]>(() => load(LS_KEYS.debts) || []);
-  const [form, setForm] = React.useState({ id:null as any, userId: users[2]?.id||3, storeId: stores[0]?.id||1, amount: 0, note: '' });
+  const [open, setOpen] = React.useState(false);
+  const [editing, setEditing] = React.useState<Debt | null>(null);
 
-  const saveForm = () => {
-    if (!form.id) {
-      const { id: _omit, ...rest } = form as any;
-      const rec = { ...rest, amount: Number(form.amount), id: genId() };
-      const next = [rec, ...list];
-      save(LS_KEYS.debts, next); setList(next);
+  const [form, setForm] = React.useState<{
+    userId: number | '';
+    storeId: string | '';
+    amount: string;
+    note: string;
+  }>({
+    userId: '',
+    storeId: stores[0]?.id || '',
+    amount: '',
+    note: '',
+  });
+
+  const persist = (rows: Debt[]) => { save(LS_KEYS.debts, rows); setAllDebts(rows); };
+
+  const staff = React.useMemo(() => {
+    const lower = q.trim().toLowerCase();
+    const base = rawUsers.filter((u) => u.role !== 'super_admin');
+    if (!lower) return base.sort((a, b) => (a.nickname || a.username).localeCompare(b.nickname || b.username));
+    return base
+      .filter((u) => includesQ(u.nickname || u.username || '', lower))
+      .sort((a, b) => (a.nickname || a.username).localeCompare(b.nickname || b.username));
+  }, [rawUsers, q]);
+
+  React.useEffect(() => {
+    if (activeUserId == null && staff[0]) setActiveUserId(staff[0].id);
+  }, [activeUserId, staff]);
+
+  const selectedUser = React.useMemo(() => rawUsers.find((u) => u.id === activeUserId) || null, [rawUsers, activeUserId]);
+
+  const list = React.useMemo(() => {
+    if (!activeUserId) return [];
+    return allDebts
+      .filter((d) => d.userId === activeUserId)
+      .sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+  }, [allDebts, activeUserId]);
+
+  const totalAmount = React.useMemo(() => list.reduce((s, d) => s + (Number(d.amount) || 0), 0), [list]);
+
+  const openCreate = () => {
+    setEditing(null);
+    setForm({ userId: activeUserId || '', storeId: stores[0]?.id || '', amount: '', note: '' });
+    setOpen(true);
+  };
+  const openEdit = (d: Debt) => {
+    setEditing(d);
+    setForm({ userId: d.userId, storeId: d.storeId, amount: String(d.amount), note: d.note || '' });
+    setOpen(true);
+  };
+  const close = () => { setOpen(false); setEditing(null); };
+
+  const onSave = () => {
+    const amountNum = Number(form.amount);
+    if (!form.userId) return alert('직원을 선택하세요.');
+    if (!form.storeId) return alert('가게를 선택하세요.');
+    if (!amountNum || isNaN(amountNum)) return alert('금액을 입력하세요.');
+
+    if (!editing) {
+      const row: Debt = {
+        id: genId(),
+        userId: Number(form.userId),
+        storeId: String(form.storeId),
+        amount: amountNum,
+        note: form.note?.trim() || '',
+        createdAt: new Date().toISOString(),
+      };
+      persist([row, ...allDebts]);
     } else {
-      const next = list.map((d:any)=> d.id===form.id ? { ...form, amount: Number(form.amount) } : d);
-      save(LS_KEYS.debts, next); setList(next);
+      const next = allDebts.map((d) =>
+        d.id === editing.id
+          ? { ...d, userId: Number(form.userId), storeId: String(form.storeId), amount: amountNum, note: form.note?.trim() || '' }
+          : d
+      );
+      persist(next);
     }
-    setForm({ id:null, userId: users[2]?.id||3, storeId: stores[0]?.id||1, amount: 0, note: '' });
+    close();
   };
 
-  const onEdit = (d:any) => setForm(d);
-  const onDelete = (id:number) => { const next = list.filter(d=> d.id!==id); save(LS_KEYS.debts, next); setList(next); };
+  const onDelete = (id: number) => {
+    if (!confirm('삭제하시겠습니까?')) return;
+    persist(allDebts.filter((d) => d.id !== id));
+  };
 
   return (
     <ClientGuard>
       <PageWrap>
-        <h2 className="text-xl font-semibold mb-4">미수금 관리</h2>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-xl font-semibold">미수금 관리</h2>
+          <div className="hidden sm:block text-sm text-slate-500">직원을 검색하여 선택한 뒤, 미수금을 관리하세요.</div>
+        </div>
 
-        <div className="card p-4">
-          <div className="grid sm:grid-cols-5 gap-3">
-            <select value={form.userId as any} onChange={e=>setForm(f=>({...f, userId:Number(e.target.value)}))} className="input">
-              {users.map((u:any)=> <option key={u.id} value={u.id}>{u.nickname||u.username}</option>)}
+        {/* 모바일 상단 영역 */}
+        <div className="lg:hidden bg-white rounded-2xl border border-slate-200 p-4 mb-4">
+          <div className="grid grid-cols-1 gap-3">
+            <input
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="직원 검색 (예: 김)"
+              className="rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-200"
+            />
+            <select
+              value={activeUserId ?? ''}
+              onChange={(e) => setActiveUserId(Number(e.target.value))}
+              className="rounded-xl border-slate-300"
+            >
+              {staff.map((u) => (
+                <option key={u.id} value={u.id}>{u.nickname || u.username}</option>
+              ))}
+              {staff.length === 0 && <option value="">직원이 없습니다</option>}
             </select>
-            <select value={form.storeId as any} onChange={e=>setForm(f=>({...f, storeId:Number(e.target.value)}))} className="input">
-              {stores.map((s:any)=> <option key={s.id} value={s.id}>{s.name}</option>)}
-            </select>
-            <input type="number" value={form.amount as any} onChange={e=>setForm(f=>({...f, amount:Number(e.target.value)}))} className="input" placeholder="금액" />
-            <input value={form.note} onChange={e=>setForm(f=>({...f, note:e.target.value}))} className="input" placeholder="비고" />
-            <button onClick={saveForm} className="btn-subtle">{form.id? '수정' : '추가'}</button>
+            <div className="flex items-center justify-between px-3 py-2 rounded-xl bg-slate-50 border border-slate-200">
+              <div className="text-sm">
+                <div className="text-slate-500">선택 직원</div>
+                <div className="font-semibold">{selectedUser ? (selectedUser.nickname || selectedUser.username) : '미선택'}</div>
+              </div>
+              <div className="text-right">
+                <div className="text-slate-500 text-sm">총 미수금</div>
+                <div className="text-base font-semibold">{fmtMoney(totalAmount)} 원</div>
+              </div>
+            </div>
+            <button onClick={openCreate} className="rounded-xl bg-slate-900 text-white hover:bg-slate-700 px-4 py-2.5" disabled={!activeUserId}>
+              + 미수금 추가
+            </button>
           </div>
         </div>
 
-        <div className="mt-6 table-wrap">
-          <table className="min-w-full text-sm">
-            <thead className="bg-slate-50">
-              <tr>
-                <th className="table-th">직원</th>
-                <th className="table-th">가게</th>
-                <th className="table-th">금액</th>
-                <th className="table-th">비고</th>
-                <th className="table-th">작업</th>
-              </tr>
-            </thead>
-            <tbody>
-              {list.map((d:any)=>{
-                const u = users.find((x:any)=>x.id===d.userId);
-                const st = stores.find((x:any)=>x.id===d.storeId);
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
+          {/* 좌측: 검색 + 직원 목록 (데스크탑) */}
+          <aside className="hidden lg:block bg-white border border-slate-200 rounded-2xl p-3 lg:col-span-1">
+            <div className="mb-2">
+              <input
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                placeholder="직원 검색 (이름/아이디)"
+                className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-200"
+              />
+            </div>
+            <div className="max-h-[65vh] overflow-auto pr-1">
+              {staff.length === 0 && <div className="text-sm text-slate-400 p-2">직원이 없습니다.</div>}
+              <ul className="space-y-1">
+                {staff.map((u) => {
+                  const myTotal = allDebts.filter((d) => d.userId === u.id).reduce((s, d) => s + (Number(d.amount) || 0), 0);
+                  const active = activeUserId === u.id;
+                  return (
+                    <li key={u.id}>
+                      <button
+                        onClick={() => setActiveUserId(u.id)}
+                        className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-left hover:bg-slate-50 ${
+                          active ? 'bg-slate-50 border border-slate-200' : ''
+                        }`}
+                      >
+                        <div className="truncate">
+                          <div className="font-medium truncate">{u.nickname || u.username}</div>
+                          <div className="text-[11px] text-slate-500">{u.role}</div>
+                        </div>
+                        <div className="text-xs text-slate-600 whitespace-nowrap">{fmtMoney(myTotal)} 원</div>
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          </aside>
+
+          {/* 우측: 리스트 */}
+          <section className="bg-white border border-slate-200 rounded-2xl lg:col-span-3 flex flex-col">
+            <div className="flex p-4 border-b border-slate-200 items-center justify-between">
+              <div>
+                <div className="text-sm text-slate-500">선택 직원</div>
+                <div className="text-base font-semibold">{selectedUser ? selectedUser.nickname || selectedUser.username : '미선택'}</div>
+              </div>
+              <div className="flex items-baseline gap-6">
+                <div>
+                  <div className="text-sm text-slate-500">총 미수금</div>
+                  <div className="text-lg font-semibold">{fmtMoney(totalAmount)} 원</div>
+                </div>
+                <button onClick={openCreate} className="hidden lg:inline-flex items-center gap-2 rounded-xl bg-slate-900 hover:bg-slate-700 text-white text-sm font-medium px-4 py-2.5" disabled={!activeUserId}>
+                  + 미수금 추가
+                </button>
+              </div>
+            </div>
+
+            {/* 모바일 카드 */}
+            <div className="lg:hidden p-3 space-y-2">
+              {list.map((d) => {
+                const st = stores.find((s) => s.id === d.storeId);
                 return (
-                  <tr key={d.id} className="border-t">
-                    <td className="table-td">{u?.nickname||u?.username}</td>
-                    <td className="table-td">{st?.name}</td>
-                    <td className="table-td">{Number(d.amount).toLocaleString()} 원</td>
-                    <td className="table-td">{d.note}</td>
-                    <td className="table-td flex gap-2">
-                      <button onClick={()=>onEdit(d)} className="btn-outline px-3 py-1.5 text-xs">수정</button>
-                      <button onClick={()=>onDelete(d.id)} className="btn-danger px-3 py-1.5 text-xs">삭제</button>
-                    </td>
-                  </tr>
+                  <div key={d.id} className="rounded-2xl border border-slate-200 p-3 bg-white">
+                    <div className="flex items-center justify-between">
+                      <div className="font-medium">{st?.name || '가게없음'}</div>
+                      <div className="text-base font-semibold">{fmtMoney(Number(d.amount))} 원</div>
+                    </div>
+                    {d.note ? <div className="text-sm text-slate-600 mt-1">{d.note}</div> : null}
+                    <div className="mt-3 flex items-center gap-2">
+                      <button onClick={() => openEdit(d)} className="px-3 py-1.5 rounded-lg border border-slate-300 hover:bg-slate-50 text-xs" title="수정" aria-label="수정">✏️</button>
+                      <button onClick={() => onDelete(d.id)} className="px-3 py-1.5 rounded-lg border border-red-300 text-red-600 hover:bg-red-50 text-xs" title="삭제" aria-label="삭제">🗑️</button>
+                    </div>
+                  </div>
                 );
               })}
-            </tbody>
-          </table>
+              {list.length === 0 && <div className="text-sm text-slate-500 p-3">미수금 내역이 없습니다.</div>}
+            </div>
+
+            {/* 데스크탑 테이블 */}
+            <div className="hidden lg:block overflow-x-auto">
+              <table className="min-w-full text-sm">
+                <thead className="bg-slate-50 sticky top-0 z-10">
+                  <tr>
+                    <th className="p-3 text-left w-[40%]">가게</th>
+                    <th className="p-3 text-left w-[20%]">금액</th>
+                    <th className="p-3 text-left">비고</th>
+                    <th className="p-3 text-left w-[16%]">작업</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {list.map((d) => {
+                    const st = stores.find((s) => s.id === d.storeId);
+                    return (
+                      <tr key={d.id} className="border-t">
+                        <td className="p-3">{st?.name || '가게없음'}</td>
+                        <td className="p-3">{fmtMoney(Number(d.amount || 0))} 원</td>
+                        <td className="p-3"><div className="line-clamp-2 text-slate-700">{d.note || '-'}</div></td>
+                        <td className="p-3">
+                          <div className="flex items-center gap-2">
+                            <button onClick={() => openEdit(d)} className="px-2.5 py-1.5 rounded-lg border border-slate-300 hover:bg-slate-50 text-xs" title="수정" aria-label="수정">✏️</button>
+                            <button onClick={() => onDelete(d.id)} className="px-2.5 py-1.5 rounded-lg border border-red-300 text-red-600 hover:bg-red-50 text-xs" title="삭제" aria-label="삭제">🗑️</button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                  {list.length === 0 && (
+                    <tr><td className="p-6 text-slate-500" colSpan={4}>미수금 내역이 없습니다.</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </section>
         </div>
+
+        {/* 팝업 */}
+        <Modal open={open} onClose={close} title={editing ? '미수금 수정' : '미수금 추가'}>
+          <div className="space-y-3">
+            <div className="grid sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs text-slate-500 mb-1">직원</label>
+                <select
+                  value={form.userId as any}
+                  onChange={(e) => setForm((f) => ({ ...f, userId: Number(e.target.value) }))}
+                  className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-200"
+                >
+                  <option value="" disabled>선택</option>
+                  {staff.map((u) => <option key={u.id} value={u.id}>{u.nickname || u.username}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs text-slate-500 mb-1">가게</label>
+                <select
+                  value={form.storeId as any}
+                  onChange={(e) => setForm((f) => ({ ...f, storeId: String(e.target.value) }))}
+                  className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-200"
+                >
+                  <option value="" disabled>선택</option>
+                  {stores.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                </select>
+              </div>
+            </div>
+
+            <div className="grid sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs text-slate-500 mb-1">금액</label>
+                <input
+                  type="number"
+                  value={form.amount}
+                  onChange={(e) => setForm((f) => ({ ...f, amount: e.target.value }))}
+                  placeholder="예) 150000"
+                  className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-200"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-slate-500 mb-1">비고</label>
+                <input
+                  value={form.note}
+                  onChange={(e) => setForm((f) => ({ ...f, note: e.target.value }))}
+                  placeholder="설명(선택)"
+                  className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-200"
+                />
+              </div>
+            </div>
+
+            <div className="pt-2 flex justify-end gap-2">
+              <button onClick={close} className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-sm px-4 py-2.5">
+                취소
+              </button>
+              <button onClick={onSave} className="inline-flex items-center gap-2 rounded-xl bg-slate-900 hover:bg-slate-700 text-white text-sm font-medium px-4 py-2.5">
+                {editing ? '수정 저장' : '추가'}
+              </button>
+            </div>
+          </div>
+        </Modal>
       </PageWrap>
     </ClientGuard>
   );
 }
+
+function Modal({ open, onClose, title, children }:{
+  open:boolean; onClose:()=>void; title?:string; children: React.ReactNode;
+}) {
+  if (!open) return null;
+  return (
+    <div className="fixed inset-0 z-50">
+      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
+      <div className="absolute left-1/2 top-1/2 w-[92vw] max-w-lg -translate-x-1/2 -translate-y-1/2">
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-lg overflow-hidden">
+          {title && <div className="px-4 py-3 border-b bg-slate-50 text-sm font-medium">{title}</div>}
+          <div className="p-4">{children}</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 ```
 
 ===== FILE: src\app\(protected)\lost\page.tsx =====
@@ -9717,19 +10267,644 @@ export default function RankingsPage() {
 
 ```
 
-===== FILE: src\app\(protected)\schedule\page.tsx =====
+===== FILE: src\app\(protected)\sales\page.tsx =====
 
 ```
 'use client';
 
-/**
- * 1-1 Schedule (API-first, LocalStorage fallback 제거)
- * DB: schedules(id uuid, user_id bigint, store_id uuid, start_at/end_at timestamptz, work_date date)
- * 권한:
- *  - staff   : 본인 것만
- *  - manager : 본인 소속 매장 전부 (stores.manager_id=본인)
- *  - super_admin : 전체
- */
+import React from 'react';
+import ClientGuard from '@/middleware/client-guard';
+import PageWrap from '@/components/PageWrap';
+import { useAuth } from '@/lib/auth';
+import { LS_KEYS, load, save, genId, todayStr } from '@/lib/storage';
+import { Search, Plus, Wallet, Store, Users, X, Pencil } from 'lucide-react';
+
+type SaleRow = {
+  id: number;
+  user_id: string;           // ← uuid (문자열)
+  legacy_user_id?: number;   // ← API가 붙여 준 숫자 id (이걸로 로컬 users 매칭)
+  store_id: string;          // uuid
+  sale_date: string;         // YYYY-MM-DD
+  amount: number;
+  cnt: number;
+  incentive: number;
+  note?: string | null;
+};
+
+const toNum = (v: any, def = 0) => {
+  const n = Number(String(v).replaceAll(',', ''));
+  return Number.isFinite(n) ? n : def;
+};
+const norm = (s: string) => s.normalize('NFC').toLowerCase();
+const isUUID = (s:string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(s);
+
+/* ---------- Modal ---------- */
+function Modal({ open, title, onClose, children }:{
+  open:boolean; title?:string; onClose:()=>void; children:React.ReactNode
+}) {
+  if (!open) return null;
+  return (
+    <div className="fixed inset-0 z-50">
+      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
+      <div className="absolute left-1/2 sm:top-1/2 sm:-translate-y-1/2 bottom-0 sm:bottom-auto w-full sm:w-[92vw] max-w-lg -translate-x-1/2">
+        <div className="bg-white rounded-t-2xl sm:rounded-2xl border border-slate-200 shadow-soft overflow-hidden">
+          <div className="px-4 py-3 border-b bg-slate-50 flex items-center justify-between">
+            <div className="text-sm font-semibold">{title}</div>
+            <button onClick={onClose} className="inline-flex h-8 w-8 items-center justify-center rounded-md hover:bg-slate-100">
+              <X size={16} />
+            </button>
+          </div>
+          <div className="p-4">{children}</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ---------- 읽기 전용 항목 ---------- */
+function ItemRow({ label, value }:{ label:string; value:React.ReactNode }) {
+  return (
+    <div className="flex items-start justify-between gap-4">
+      <div className="text-xs text-slate-500 mt-1">{label}</div>
+      <div className="text-sm text-slate-800 text-right break-words">{value}</div>
+    </div>
+  );
+}
+
+export default function SalesPage() {
+  const { user } = useAuth();
+
+  const users = load<any[]>(LS_KEYS.users) || [];
+
+  // ✅ stores: API 우선 로드(실패 시 LS 폴백). API 성공 시 반드시 UUID id를 보유
+  const [stores, setStores] = React.useState<{id:string;name:string}[]>([]);
+  const [storesFromApi, setStoresFromApi] = React.useState(false);
+  React.useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch('/api/stores', { cache: 'no-store' });
+        const json = await res.json();
+        const list = (json?.rows || []).map((s:any) => ({ id: String(s.id), name: s.name }));
+        if (list.length) {
+          setStores(list);
+          setStoresFromApi(true);
+          return;
+        }
+        throw new Error('empty');
+      } catch {
+        const ls = (load<any[]>(LS_KEYS.stores) || []).map((s:any)=> ({ id: String(s.id), name: s.name }));
+        setStores(ls);
+        setStoresFromApi(false);
+      }
+    })();
+  }, []);
+
+  const [rows, setRows] = React.useState<SaleRow[]>([]);
+  const [q, setQ] = React.useState('');
+  const [dateFrom, setDateFrom] = React.useState(todayStr());
+  const [dateTo, setDateTo] = React.useState(todayStr());
+  const [storeFilter, setStoreFilter] = React.useState<'all' | string>('all');
+
+  const [detailOpen, setDetailOpen] = React.useState(false);
+  const [editOpen, setEditOpen] = React.useState(false);
+  const [modalKey, setModalKey] = React.useState(0);
+  const [selected, setSelected] = React.useState<SaleRow | null>(null);
+
+  const [form, setForm] = React.useState({
+    id: null as number | null,
+    userId: user?.id || 0,         // ← 숫자(로컬 유저 id)
+    userSearch: '',
+    storeId: '' as string,          // uuid or fallback
+    date: todayStr(),
+    amount: '',
+    count: '',
+    incentive: '',
+    note: '',
+  });
+
+  // 직원명 표시(검색/테이블/상세 공통)
+  const displayUserName = React.useCallback((r: SaleRow) => {
+    if (typeof r.legacy_user_id === 'number') {
+      const u = users.find((x:any) => x.id === r.legacy_user_id);
+      if (u) return u.nickname || u.username || `ID ${r.legacy_user_id}`;
+    }
+    const maybeNum = Number(r.user_id);
+    if (Number.isFinite(maybeNum)) {
+      const u = users.find((x:any) => x.id === maybeNum);
+      if (u) return u.nickname || u.username || `ID ${maybeNum}`;
+    }
+    return '알 수 없음';
+  }, [users]);
+
+  /* ---------- 로드 ---------- */
+  const loadSales = React.useCallback(async () => {
+    if (!user) return;
+    try {
+      const role = user.role as 'staff'|'manager'|'super_admin';
+      const qs = new URLSearchParams({ role, dateFrom, dateTo });
+      if (role === 'staff') qs.set('userId', String(user.id));
+      if (role === 'manager') qs.set('managerId', String(user.id));
+      // UUID일 때만 서버 필터 적용
+      if (storeFilter !== 'all' && isUUID(String(storeFilter))) {
+        qs.set('storeId', String(storeFilter));
+      }
+      const res = await fetch(`/api/sales?${qs.toString()}`, { cache: 'no-store' });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json?.error || 'load failed');
+
+      // 서버에서 내려오는 user_id(uuid) + (선택적으로) legacy_user_id
+      setRows((json.rows || []) as SaleRow[]);
+      save('cache_sales', json.rows || []);
+    } catch {
+      // 폴백: 로컬 스토리지 구조를 SaleRow로 맞춰서 변환
+      const cache = (load<any[]>('cache_sales') || []) as SaleRow[];
+      if (cache.length) { setRows(cache); return; }
+      const ls = (load<any[]>(LS_KEYS.sales) || []).map((r:any) => ({
+        id: Number(r.id)||genId(),
+        user_id: String(r.userId),         // ← LS는 숫자이므로 문자열로
+        legacy_user_id: Number(r.userId),  // ← 표시용 매칭을 위해 같이 보관
+        store_id: String(r.storeId),
+        sale_date: String(r.date||todayStr()),
+        amount: Number(r.amount||0),
+        cnt: Number(r.count||0),
+        incentive: Number(r.incentive||0),
+        note: r.note ?? null
+      })) as SaleRow[];
+      setRows(ls);
+    }
+  }, [user, dateFrom, dateTo, storeFilter]);
+
+  React.useEffect(() => { loadSales(); }, [loadSales]);
+
+  /* ---------- 검색/정렬 ---------- */
+  const scoped = React.useMemo(() => {
+    if (!user) return [] as SaleRow[];
+    let base = rows.slice();
+
+    const n = norm(q.trim());
+    if (n) {
+      base = base.filter((r) => {
+        const name = displayUserName(r);
+        const s = stores.find((x:any)=> String(x.id)===String(r.store_id));
+        return (
+          norm(name||'').includes(n) ||
+          norm(s?.name||'').includes(n) ||
+          norm(r.note||'').includes(n)
+        );
+      });
+    }
+    base.sort((a,b)=> (b.sale_date + String(b.id)).localeCompare(a.sale_date + String(a.id)));
+    return base;
+  }, [rows, q, stores, user, displayUserName]);
+
+  /* ---------- 합계 ---------- */
+  const totalAmount = scoped.reduce((sum,r)=> sum + (r.amount||0), 0);
+  const totalCount  = scoped.reduce((sum,r)=> sum + (r.cnt||0), 0);
+
+  /* ---------- 직원 검색 후보 ---------- */
+  const filteredEmployees = React.useMemo(() => {
+    const needle = norm(form.userSearch.trim());
+    const pool = users;
+    if (!needle) return pool;
+    return pool.filter((u:any)=> norm(u.nickname||u.username||'').includes(needle));
+  }, [form.userSearch, users]);
+
+  /* ---------- 보기/편집 ---------- */
+  const openDetail = (r: SaleRow) => { setSelected(r); setDetailOpen(true); };
+
+  const openCreate = () => {
+    const defaultStore = stores[0]?.id || '';
+    setSelected(null);
+    setForm(f => ({
+      ...f,
+      id: null,
+      userId: user?.id || (users[0]?.id ?? 0),
+      storeId: defaultStore,
+      date: todayStr(),
+      amount: '',
+      count: '',
+      incentive: '',
+      note: '',
+    }));
+    setModalKey(k=>k+1);
+    setEditOpen(true);
+  };
+
+  const openEditFromDetail = () => {
+    if (!selected) return;
+
+    // 편집 폼의 userId는 "숫자(로컬)"가 필요 → legacy_user_id 우선, 없으면 user_id 숫자 변환 폴백
+    const editUserId =
+      (typeof selected.legacy_user_id === 'number' ? selected.legacy_user_id :
+       Number(selected.user_id)) || (user?.id || 0);
+
+    setForm({
+      id: selected.id,
+      userId: editUserId,
+      userSearch: '',
+      storeId: String(selected.store_id),
+      date: selected.sale_date,
+      amount: String(selected.amount),
+      count: String(selected.cnt),
+      incentive: String(selected.incentive||0),
+      note: selected.note || '',
+    });
+    setDetailOpen(false);
+    setModalKey(k=>k+1);
+    setEditOpen(true);
+  };
+
+  // 권한 체크: 직원은 자기 레코드만 수정 가능 (legacy_user_id 우선 비교)
+  const canEditRow = (r: SaleRow) => {
+    if (user?.role !== 'staff') return true;
+    if (typeof r.legacy_user_id === 'number') return r.legacy_user_id === user?.id;
+    const maybeNum = Number(r.user_id);
+    return Number.isFinite(maybeNum) ? maybeNum === user?.id : false;
+  };
+
+  /* ---------- 저장/삭제 ---------- */
+  const onSave = async () => {
+    if (!user) return;
+    if (user.role==='staff' && form.userId !== user.id) return alert('직원은 본인 매출만 등록/수정 가능합니다.');
+    if (!form.storeId) return alert('가게를 선택하세요.');
+    if (!form.date) return alert('날짜를 선택하세요.');
+
+    const payload = {
+      userId: form.userId,
+      storeId: String(form.storeId), // uuid ideally
+      date: form.date,
+      amount: Math.max(0, toNum(form.amount)),
+      count: Math.max(0, toNum(form.count)),
+      incentive: Math.max(0, toNum(form.incentive)),
+      note: form.note?.trim() || null,
+    };
+
+    // ✅ API로 받은 매장(UUID)이 아닐 경우: 무조건 LS 폴백 (DB에 숫자 "1" 같은 값이 들어가지 않도록)
+    const mustFallbackLS = !storesFromApi || !isUUID(payload.storeId);
+
+    try {
+      if (!mustFallbackLS) {
+        if (form.id == null) {
+          const res = await fetch('/api/sales', {
+            method: 'POST', headers:{ 'content-type':'application/json' },
+            body: JSON.stringify(payload)
+          });
+          const json = await res.json();
+          if (!res.ok) throw new Error(json?.error || 'create failed');
+        } else {
+          const res = await fetch('/api/sales', {
+            method: 'PATCH', headers:{ 'content-type':'application/json' },
+            body: JSON.stringify({ id: form.id, ...payload })
+          });
+          const json = await res.json();
+          if (!res.ok) throw new Error(json?.error || 'update failed');
+        }
+      } else {
+        // LS 폴백 저장
+        const prev = (load<any[]>(LS_KEYS.sales) || []);
+        if (form.id == null) {
+          const rec = {
+            id: genId(),
+            userId: payload.userId,
+            storeId: payload.storeId, // 숫자라도 로컬엔 저장 가능
+            date: payload.date,
+            amount: payload.amount,
+            count: payload.count,
+            incentive: payload.incentive,
+            note: payload.note
+          };
+          save(LS_KEYS.sales, [rec, ...prev]);
+        } else {
+          const next = prev.map((r:any)=> r.id===form.id ? {
+            ...r,
+            userId: payload.userId,
+            storeId: payload.storeId,
+            date: payload.date,
+            amount: payload.amount,
+            count: payload.count,
+            incentive: payload.incentive,
+            note: payload.note
+          } : r);
+          save(LS_KEYS.sales, next);
+        }
+      }
+      setEditOpen(false);
+      await loadSales();
+    } catch (e:any) {
+      // 마지막 안전망: 실패 시에도 LS에 저장
+      const prev = (load<any[]>(LS_KEYS.sales) || []);
+      if (form.id == null) {
+        const rec = {
+          id: genId(),
+          userId: payload.userId,
+          storeId: payload.storeId,
+          date: payload.date,
+          amount: payload.amount,
+          count: payload.count,
+          incentive: payload.incentive,
+          note: payload.note
+        };
+        save(LS_KEYS.sales, [rec, ...prev]);
+      } else {
+        const next = prev.map((r:any)=> r.id===form.id ? {
+          ...r,
+          userId: payload.userId,
+          storeId: payload.storeId,
+          date: payload.date,
+          amount: payload.amount,
+          count: payload.count,
+          incentive: payload.incentive,
+          note: payload.note
+        } : r);
+        save(LS_KEYS.sales, next);
+      }
+      setEditOpen(false);
+      await loadSales();
+    }
+  };
+
+  const onDelete = async (id:number) => {
+    if (!confirm('삭제하시겠습니까?')) return;
+    try {
+      if (storesFromApi) {
+        const res = await fetch('/api/sales', {
+          method: 'DELETE', headers:{ 'content-type':'application/json' },
+          body: JSON.stringify({ id })
+        });
+        const json = await res.json();
+        if (!res.ok) throw new Error(json?.error || 'delete failed');
+      } else {
+        const prev = (load<any[]>(LS_KEYS.sales) || []);
+        save(LS_KEYS.sales, prev.filter((r:any)=> r.id!==id));
+      }
+      setDetailOpen(false);
+      await loadSales();
+    } catch {
+      const prev = (load<any[]>(LS_KEYS.sales) || []);
+      save(LS_KEYS.sales, prev.filter((r:any)=> r.id!==id));
+      setDetailOpen(false);
+      await loadSales();
+    }
+  };
+
+  const RowMobile = ({ r }: { r: SaleRow }) => {
+    const s = stores.find((x:any)=> String(x.id)===String(r.store_id));
+    const name = displayUserName(r);
+    return (
+      <button onClick={()=>openDetail(r)} className="w-full text-left rounded-2xl border border-slate-200 px-4 py-3 bg-white shadow-sm active:scale-[0.99] transition">
+        <div className="text-base font-medium">{r.sale_date}</div>
+        <div className="mt-1 text-sm text-slate-600 flex items-center gap-2">
+          <span className="inline-flex items-center gap-1 min-w-0">
+            <Users size={14} className="text-slate-400 shrink-0" />
+            <span className="truncate">{name}</span>
+          </span>
+          <span className="text-slate-300">·</span>
+          <span className="inline-flex items-center gap-1 min-w-0">
+            <Store size={14} className="text-slate-400 shrink-0" />
+            <span className="truncate">{s?.name || '-'}</span>
+          </span>
+        </div>
+      </button>
+    );
+  };
+
+  const RowDesktop = ({ r }: { r: SaleRow }) => {
+    const s = stores.find((x:any)=> String(x.id)===String(r.store_id));
+    return (
+      <tr className="border-t cursor-pointer hover:bg-slate-50" onClick={()=>openDetail(r)}>
+        <td className="p-3">{r.sale_date}</td>
+        <td className="p-3">{displayUserName(r)}</td>
+        <td className="p-3">{s?.name || '-'}</td>
+      </tr>
+    );
+  };
+
+  return (
+    <ClientGuard>
+      <PageWrap>
+        {/* 헤더 */}
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <Wallet className="text-slate-700" />
+            <h2 className="text-xl font-semibold">매출</h2>
+          </div>
+          <div className="hidden sm:block">
+            <button
+              onClick={openCreate}
+              className="inline-flex items-center gap-2 rounded-xl bg-slate-900 hover:bg-slate-700 text-white text-sm font-medium px-4 py-2.5"
+            >
+              <Plus size={16} /> 매출 입력
+            </button>
+          </div>
+        </div>
+
+        {/* 컨트롤 */}
+        <div className="flex flex-wrap items-center gap-2 mb-4">
+          <div className="relative">
+            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              value={q} onChange={(e)=>setQ(e.target.value)}
+              placeholder="직원/가게/메모 검색"
+              className="w-[220px] max-w-[70vw] pl-9 pr-3 py-2 rounded-xl border border-slate-300 bg-white text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-200"
+            />
+          </div>
+
+          <div className="flex items-center gap-2">
+            <input type="date" value={dateFrom} onChange={(e)=>setDateFrom(e.target.value)} className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm" />
+            <span className="text-slate-400 text-sm">~</span>
+            <input type="date" value={dateTo} onChange={(e)=>setDateTo(e.target.value)} className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm" />
+          </div>
+
+          <select
+            value={storeFilter as any}
+            onChange={(e)=> setStoreFilter(e.target.value==='all' ? 'all' : String(e.target.value))}
+            className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm"
+            title={storesFromApi ? 'API 매장 로드됨' : '로컬 매장(숫자 ID) — 서버 필터 미적용'}
+          >
+            <option value="all">전체 매장</option>
+            {stores.map((s:any)=> <option key={s.id} value={s.id}>{s.name}</option>)}
+          </select>
+        </div>
+
+        {/* 집계 */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
+          <div className="bg-white rounded-2xl border border-slate-200 p-4">
+            <div className="text-xs text-slate-500">총 매출</div>
+            <div className="text-lg font-semibold mt-1">{totalAmount.toLocaleString()} 원</div>
+          </div>
+          <div className="bg-white rounded-2xl border border-slate-200 p-4">
+            <div className="text-xs text-slate-500">총 건수</div>
+            <div className="text-lg font-semibold mt-1">{totalCount} 건</div>
+          </div>
+          <div className="bg-white rounded-2xl border border-slate-200 p-4">
+            <div className="text-xs text-slate-500">평균 매출/건</div>
+            <div className="text-lg font-semibold mt-1">
+              {totalCount ? Math.round(totalAmount/totalCount).toLocaleString() : 0} 원
+            </div>
+          </div>
+        </div>
+
+        {/* 목록 */}
+        <div className="bg-transparent sm:bg-white sm:border sm:border-slate-200 sm:rounded-2xl">
+          {/* 모바일 카드 */}
+          <div className="sm:hidden grid gap-2">
+            {scoped.length===0 ? (
+              <div className="p-4 text-slate-500 text-sm">표시할 매출이 없습니다.</div>
+            ) : (
+              scoped.map(r=> <RowMobile key={r.id} r={r} />)
+            )}
+          </div>
+          {/* 데스크탑 테이블 */}
+          <div className="hidden sm:block overflow-x-auto">
+            <table className="min-w-full text-sm">
+              <thead className="bg-slate-50">
+                <tr>
+                  <th className="p-3 text-left">날짜</th>
+                  <th className="p-3 text-left">직원</th>
+                  <th className="p-3 text-left">가게</th>
+                </tr>
+              </thead>
+              <tbody>
+                {scoped.length===0 ? (
+                  <tr><td className="p-4 text-slate-500" colSpan={3}>표시할 매출이 없습니다.</td></tr>
+                ) : scoped.map(r=> <RowDesktop key={r.id} r={r} />)}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* 모바일 FAB */}
+        <button
+          onClick={openCreate}
+          className="sm:hidden fixed right-4 bottom-20 z-40 rounded-full shadow-soft bg-slate-900 text-white px-4 py-3 inline-flex items-center gap-2"
+        >
+          <Plus size={16} /> 매출 입력
+        </button>
+
+        {/* 보기 모달 */}
+        <Modal open={detailOpen} onClose={()=>setDetailOpen(false)} title="매출 상세">
+          {!selected ? null : (
+            <div className="space-y-3">
+              <ItemRow label="날짜" value={selected.sale_date} />
+              <ItemRow label="직원" value={displayUserName(selected)} />
+              <ItemRow label="가게" value={(stores.find(s=> String(s.id)===String(selected.store_id))?.name) || '-'} />
+              <ItemRow label="매출액" value={`${(selected.amount||0).toLocaleString()} 원`} />
+              <ItemRow label="건수" value={`${selected.cnt||0} 건`} />
+              <ItemRow label="인센티브" value={`${(selected.incentive||0).toLocaleString()} 원`} />
+              {selected.note ? <ItemRow label="메모" value={selected.note} /> : null}
+
+              <div className="pt-2 flex justify-between">
+                {canEditRow(selected) ? (
+                  <button onClick={()=>onDelete(selected.id)} className="text-sm text-red-600 hover:underline">삭제</button>
+                ) : <div />}
+
+                <div className="flex gap-2">
+                  <button onClick={()=>setDetailOpen(false)} className="rounded-xl border border-slate-300 bg-white hover:bg-slate-50 px-4 py-2 text-sm">닫기</button>
+                  {canEditRow(selected) && (
+                    <button onClick={openEditFromDetail} className="rounded-xl bg-slate-900 hover:bg-slate-700 text-white px-4 py-2 text-sm inline-flex items-center gap-1">
+                      <Pencil size={14} /> 수정
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+        </Modal>
+
+        {/* 편집 모달 */}
+        <Modal open={editOpen} onClose={()=>setEditOpen(false)} title={form.id ? '매출 수정' : '매출 입력'}>
+          <div key={modalKey} className="space-y-3">
+            {/* 직원 (관리자/부관리자만) */}
+            {user?.role!=='staff' ? (
+              <div className="space-y-2">
+                <label className="block text-xs text-slate-500">직원</label>
+                <div className="flex gap-2">
+                  <div className="relative flex-1">
+                    <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <input
+                      value={form.userSearch}
+                      onChange={(e)=>setForm(f=>({...f, userSearch: e.target.value}))}
+                      placeholder="이름 검색 (예: 김)"
+                      className="w-full pl-9 pr-3 py-2 rounded-xl border border-slate-300 bg-white text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-200"
+                    />
+                  </div>
+                  <select
+                    value={form.userId as any}
+                    onChange={(e)=>setForm(f=>({...f, userId: Number(e.target.value)}))}
+                    className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm"
+                  >
+                    {filteredEmployees.map((u:any)=> (
+                      <option key={u.id} value={u.id}>{u.nickname || u.username}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            ) : (
+              <div className="text-sm text-slate-600">
+                직원: <span className="font-medium">{users.find((u:any)=>u.id===form.userId)?.nickname || users.find((u:any)=>u.id===form.userId)?.username}</span>
+              </div>
+            )}
+
+            {/* 가게 */}
+            <div>
+              <label className="block text-xs text-slate-500 mb-1">가게</label>
+              <select
+                value={form.storeId}
+                onChange={(e)=>setForm(f=>({...f, storeId: String(e.target.value)}))}
+                className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm"
+              >
+                {stores.map((s:any)=> <option key={s.id} value={s.id}>{s.name}</option>)}
+              </select>
+              {!storesFromApi && (
+                <div className="mt-1 text-xs text-amber-600">
+                  * 서버 매장 목록을 불러오지 못해 로컬(ID: {form.storeId})로 저장됩니다.
+                </div>
+              )}
+            </div>
+
+            {/* 날짜/금액/건수/인센티브/메모 */}
+            <div>
+              <label className="block text-xs text-slate-500 mb-1">날짜</label>
+              <input type="date" value={form.date} onChange={(e)=>setForm(f=>({...f, date: e.target.value }))} className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm" />
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+              <div>
+                <label className="block text-xs text-slate-500 mb-1">매출액(원)</label>
+                <input inputMode="numeric" value={form.amount} onChange={(e)=>setForm(f=>({...f, amount: e.target.value }))} placeholder="0" className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm" />
+              </div>
+              <div>
+                <label className="block text-xs text-slate-500 mb-1">건수</label>
+                <input inputMode="numeric" value={form.count} onChange={(e)=>setForm(f=>({...f, count: e.target.value }))} placeholder="0" className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm" />
+              </div>
+              <div>
+                <label className="block text-xs text-slate-500 mb-1">인센티브(원)</label>
+                <input inputMode="numeric" value={form.incentive} onChange={(e)=>setForm(f=>({...f, incentive: e.target.value }))} placeholder="0" className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm" />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs text-slate-500 mb-1">메모</label>
+              <input value={form.note} onChange={(e)=>setForm(f=>({...f, note: e.target.value }))} placeholder="선택 입력" className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm" />
+            </div>
+
+            <div className="pt-2 flex justify-end gap-2">
+              <button onClick={()=>setEditOpen(false)} className="rounded-xl border border-slate-300 bg-white hover:bg-slate-50 px-4 py-2 text-sm">닫기</button>
+              <button onClick={onSave} className="rounded-xl bg-slate-900 hover:bg-slate-700 text-white px-4 py-2 text-sm">저장</button>
+            </div>
+          </div>
+        </Modal>
+      </PageWrap>
+    </ClientGuard>
+  );
+}
+
+```
+
+===== FILE: src\app\(protected)\schedule\page.tsx =====
+
+```
+'use client';
 
 import React from 'react';
 import ClientGuard from '@/middleware/client-guard';
@@ -9760,7 +10935,6 @@ export default function SchedulePage() {
   const [rows, setRows] = React.useState<Row[]>([]);
   const [loading, setLoading] = React.useState(false);
 
-  // 필터/폼
   const [date, setDate] = React.useState(todayStr());
   const [storeId, setStoreId] = React.useState<string>('');
   const [startTime, setStartTime] = React.useState('09:00');
@@ -9768,12 +10942,13 @@ export default function SchedulePage() {
   const [editId, setEditId]       = React.useState<string | null>(null);
   const [error, setError]         = React.useState('');
 
-  // 스토어 로드
+  // 스토어 로드 (API → 실패 시 LS)
   const loadStores = React.useCallback(async () => {
     try {
-      const res = await fetch('/api/stores');
+      const res = await fetch('/api/stores', { cache: 'no-store' });
       const json = await res.json();
-      const list = (json?.rows || json || []).map((s:any) => ({ id: String(s.id), name: s.name }));
+      if (!res.ok) throw new Error(json?.error || 'load fail');
+      const list = (json?.rows || []).map((s:any) => ({ id: String(s.id), name: s.name }));
       setStores(list);
       setStoreId(list[0]?.id || '');
     } catch {
@@ -9798,7 +10973,7 @@ export default function SchedulePage() {
       if (role === 'staff') qs.set('userId', String(user.id));
       if (role === 'manager') qs.set('managerId', String(user.id));
 
-      const res = await fetch(`/api/schedules?${qs.toString()}`);
+      const res = await fetch(`/api/schedules?${qs.toString()}`, { cache: 'no-store' });
       const json = await res.json();
       if (!res.ok) throw new Error(json?.error || 'load fail');
       setRows(json.rows || []);
@@ -9812,15 +10987,14 @@ export default function SchedulePage() {
   React.useEffect(() => { loadStores(); }, [loadStores]);
   React.useEffect(() => { loadSchedules(); }, [loadSchedules]);
 
-  // 유틸: date + HH:mm → ISO
+  // date + HH:mm → ISO (UTC 기준으로 만들어 일관성)
   const toISO = (d: string, hhmm: string) => {
     const [h, m] = hhmm.split(':').map(Number);
-    const base = new Date(d + 'T00:00:00Z'); // UTC 00시
+    const base = new Date(d + 'T00:00:00Z');
     base.setUTCHours(h, m, 0, 0);
     return base.toISOString();
   };
 
-  // 저장(추가/수정)
   const onSave = async () => {
     if (!user) return;
     if (!storeId) return alert('가게를 선택하세요.');
@@ -9830,37 +11004,38 @@ export default function SchedulePage() {
       return alert('퇴근이 출근 이후여야 합니다.');
     }
 
-    if (!editId) {
-      // 생성
-      const res = await fetch('/api/schedules', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          userId: user.id,
-          storeId,
-          startAt,
-          endAt
-        })
-      });
-      const json = await res.json();
-      if (!res.ok) return alert(json?.error || '생성 실패');
-    } else {
-      // 수정
-      const res = await fetch('/api/schedules', {
-        method: 'PATCH',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          id: editId,
-          storeId,
-          startAt,
-          endAt
-        })
-      });
-      const json = await res.json();
-      if (!res.ok) return alert(json?.error || '수정 실패');
+    try {
+      if (!editId) {
+        const res = await fetch('/api/schedules', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({
+            userId: user.id,
+            storeId,           // 문자열 그대로
+            startAt, endAt
+          })
+        });
+        const json = await res.json();
+        if (!res.ok) throw new Error(json?.error || '생성 실패');
+      } else {
+        const res = await fetch('/api/schedules', {
+          method: 'PATCH',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({
+            id: editId,
+            storeId,
+            startAt,
+            endAt
+          })
+        });
+        const json = await res.json();
+        if (!res.ok) throw new Error(json?.error || '수정 실패');
+      }
+      setEditId(null);
+      await loadSchedules();
+    } catch (e:any) {
+      alert(e?.message || '저장 실패');
     }
-    setEditId(null);
-    await loadSchedules();
   };
 
   const onEdit = (r: Row) => {
@@ -9886,7 +11061,6 @@ export default function SchedulePage() {
     await loadSchedules();
   };
 
-  // 표에 보여줄 범위: 권한에 따라 rows 그대로(백엔드에서 필터됨)
   const users = load<any[]>(LS_KEYS.users) || [];
 
   return (
@@ -9921,20 +11095,16 @@ export default function SchedulePage() {
             <tbody>
               {rows.map(r => {
                 const u = users.find((x:any)=> x.id === r.user_id);
-                const storeName = stores.find(s=> String(s.id)===String(r.store_id))?.name || '-';
+                const st = stores.find(s=> String(s.id) === String(r.store_id))?.name || '-';
                 return (
                   <tr key={r.id} className="border-t">
                     <td className="p-3">{u?.nickname || u?.username || r.user_id}</td>
-                    <td className="p-3">{storeName}</td>
+                    <td className="p-3">{st}</td>
                     <td className="p-3">{fmt(r.start_at)}</td>
                     <td className="p-3">{fmt(r.end_at)}</td>
                     <td className="p-3 flex gap-2">
-                      {user?.id === r.user_id || user?.role !== 'staff' ? (
-                        <>
-                          <button onClick={()=>onEdit(r)} className="px-2 py-1 rounded-lg bg-slate-900 text-white text-xs">수정</button>
-                          <button onClick={()=>onDelete(r.id)} className="px-2 py-1 rounded-lg bg-red-600 text-white text-xs">삭제</button>
-                        </>
-                      ) : <span className="text-slate-400 text-xs">권한없음</span>}
+                      <button onClick={()=>onEdit(r)} className="px-2 py-1 rounded-lg bg-slate-900 text-white text-xs">수정</button>
+                      <button onClick={()=>onDelete(r.id)} className="px-2 py-1 rounded-lg bg-red-600 text-white text-xs">삭제</button>
                     </td>
                   </tr>
                 );
@@ -9956,276 +11126,235 @@ export default function SchedulePage() {
 ```
 'use client';
 
-/**
- * 가게 관리 (API-first, LocalStorage는 미사용)
- * API: /api/stores — GET, POST, PATCH, DELETE
- * 필드: { id(uuid|bigint), name, location, manager_id }
- *
- * 권한: super_admin만 접근
- */
 import React from 'react';
 import ClientGuard from '@/middleware/client-guard';
 import PageWrap from '@/components/PageWrap';
 import { useAuth } from '@/lib/auth';
-import { LS_KEYS, load } from '@/lib/storage';
+import { LS_KEYS, load, save, genId } from '@/lib/storage';
 
-type StoreRow = {
-  id: string | number;
-  name: string;
-  location: string | null;
-  manager_id: number | null;
-};
+type StoreRow = { id: number|string; name: string; managerId: number };
+type User = { id: number; username: string; nickname?: string; role: string };
 
 export default function StoresPage() {
   const { user } = useAuth();
-  const isAdmin = user?.role === 'super_admin';
-
-  // 부관리자 목록(간단: LS에서 로드)
-  const managers = (load<any[]>(LS_KEYS.users) || []).filter(u => u.role === 'manager');
-
-  const [rows, setRows] = React.useState<StoreRow[]>([]);
-  const [loading, setLoading] = React.useState(false);
-  const [error, setError] = React.useState('');
-  const [form, setForm] = React.useState<{
-    id: string | number | null;
-    name: string;
-    location: string;
-    managerId: number | '' | null;
-  }>({
-    id: null,
-    name: '',
-    location: '',
-    managerId: managers[0]?.id ?? null,
-  });
-
-  // ------------ API ------------
-  const fetchList = React.useCallback(async () => {
-    setLoading(true);
-    setError('');
-    try {
-      const res = await fetch('/api/stores', { cache: 'no-store' });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json?.error || '목록 조회 실패');
-      setRows((json.rows || []) as StoreRow[]);
-    } catch (e: any) {
-      setError(e?.message || '목록 조회 실패');
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  const createStore = async () => {
-    if (!form.name.trim()) return alert('가게 이름을 입력하세요.');
-    const body = {
-      name: form.name.trim(),
-      location: form.location.trim() || null,
-      manager_id:
-        form.managerId === '' ? null : form.managerId === null ? null : Number(form.managerId),
-    };
-    const res = await fetch('/api/stores', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(body),
-    });
-    const json = await res.json();
-    if (!res.ok) throw new Error(json?.error || '가게 생성 실패');
-    return json.row as StoreRow;
-  };
-
-  const updateStore = async () => {
-    if (!form.id) return alert('수정할 항목이 없습니다.');
-    const body = {
-      id: form.id,
-      name: form.name.trim(),
-      location: form.location.trim(),
-      manager_id:
-        form.managerId === '' ? null : form.managerId === null ? null : Number(form.managerId),
-    };
-    const res = await fetch('/api/stores', {
-      method: 'PATCH',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(body),
-    });
-    const json = await res.json();
-    if (!res.ok) throw new Error(json?.error || '가게 수정 실패');
-    return json.row as StoreRow;
-  };
-
-  const deleteStore = async (id: string | number) => {
-    const res = await fetch('/api/stores', {
-      method: 'DELETE',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ id }),
-    });
-    const json = await res.json();
-    if (!res.ok) throw new Error(json?.error || '가게 삭제 실패');
-  };
-
-  // ------------ 이벤트 ------------
-  const resetForm = () =>
-    setForm({
-      id: null,
-      name: '',
-      location: '',
-      managerId: managers[0]?.id ?? null,
-    });
-
-  const onSave = async () => {
-    try {
-      setLoading(true);
-      if (!form.id) {
-        await createStore();
-      } else {
-        await updateStore();
-      }
-      resetForm();
-      await fetchList();
-    } catch (e: any) {
-      alert(e?.message || '저장 실패');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const onEdit = (s: StoreRow) => {
-    setForm({
-      id: s.id,
-      name: s.name || '',
-      location: s.location || '',
-      managerId: s.manager_id ?? '',
-    });
-    // 스크롤 상단으로 살짝
-    if (typeof window !== 'undefined') window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
-
-  const onDelete = async (id: string | number) => {
-    if (!confirm('삭제하시겠습니까?')) return;
-    try {
-      setLoading(true);
-      await deleteStore(id);
-      await fetchList();
-    } catch (e: any) {
-      alert(e?.message || '삭제 실패');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  React.useEffect(() => {
-    fetchList();
-  }, [fetchList]);
-
-  if (!isAdmin) {
+  if (user?.role !== 'super_admin') {
     return (
       <ClientGuard>
         <PageWrap>
+          <h2 className="text-xl font-semibold mb-4">가게 관리</h2>
           <div className="text-slate-600">권한이 없습니다.</div>
         </PageWrap>
       </ClientGuard>
     );
   }
 
+  const managers = (load<User[]>(LS_KEYS.users) || []).filter(u => u.role === 'manager');
+  const [list, setList] = React.useState<StoreRow[]>(
+    () => (load<any[]>(LS_KEYS.stores) || []).map(s => ({ id: s.id, name: s.name, managerId: s.managerId }))
+  );
+
+  const [open, setOpen] = React.useState(false);
+  const [editing, setEditing] = React.useState<StoreRow | null>(null);
+  const [form, setForm] = React.useState<{ name: string; managerId: number | '' }>({
+    name: '',
+    managerId: managers[0]?.id ?? '',
+  });
+
+  const persist = (rows: StoreRow[]) => { save(LS_KEYS.stores, rows); setList(rows); };
+
+  const openCreate = () => {
+    setEditing(null);
+    setForm({ name: '', managerId: managers[0]?.id ?? '' });
+    setOpen(true);
+  };
+  const openEdit = (row: StoreRow) => {
+    setEditing(row);
+    setForm({ name: row.name, managerId: row.managerId });
+    setOpen(true);
+  };
+  const close = () => { setOpen(false); setEditing(null); };
+
+  const onSave = () => {
+    if (!form.name.trim()) return alert('가게 이름을 입력하세요.');
+    if (!form.managerId) return alert('부관리자를 선택하세요.');
+    if (!editing) {
+      const row: StoreRow = { id: genId(), name: form.name.trim(), managerId: Number(form.managerId) };
+      persist([row, ...list]);
+    } else {
+      const next = list.map(s => s.id === editing.id ? { ...s, name: form.name.trim(), managerId: Number(form.managerId) } : s);
+      persist(next);
+    }
+    close();
+  };
+
+  const onDelete = (id: StoreRow['id']) => {
+    if (!confirm('삭제하시겠습니까?')) return;
+    persist(list.filter(s => s.id !== id));
+  };
+
+  const managerName = (id: number) => {
+    const m = managers.find(x => x.id === id);
+    return m ? (m.nickname || m.username) : '-';
+  };
+
   return (
     <ClientGuard>
       <PageWrap>
-        <h2 className="text-xl font-semibold mb-4">가게 관리</h2>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-xl font-semibold">가게 관리</h2>
+          <button
+            onClick={openCreate}
+            className="rounded-xl bg-slate-900 hover:bg-slate-700 text-white text-sm font-medium px-4 py-2.5"
+          >
+            + 가게 추가
+          </button>
+        </div>
 
-        {/* 폼 */}
-        <div className="bg-white rounded-2xl border border-slate-200 p-4">
-          <div className="grid sm:grid-cols-4 gap-3">
-            <input
-              value={form.name}
-              onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-              className="rounded-xl border-slate-300"
-              placeholder="가게 이름"
-            />
-            <input
-              value={form.location}
-              onChange={(e) => setForm((f) => ({ ...f, location: e.target.value }))}
-              className="rounded-xl border-slate-300"
-              placeholder="위치(선택)"
-            />
-            <select
-              value={(form.managerId as any) ?? ''}
-              onChange={(e) =>
-                setForm((f) => ({
-                  ...f,
-                  managerId: e.target.value === '' ? '' : Number(e.target.value),
-                }))
-              }
-              className="rounded-xl border-slate-300"
-            >
-              <option value="">부관리자 없음</option>
-              {managers.map((m: any) => (
-                <option key={m.id} value={m.id}>
-                  {m.nickname || m.username} (#{m.id})
-                </option>
-              ))}
-            </select>
-            <button
-              onClick={onSave}
-              disabled={loading || !form.name.trim()}
-              className="rounded-xl bg-slate-900 text-white hover:bg-slate-700 disabled:opacity-50"
-            >
-              {form.id ? '수정' : '추가'}
-            </button>
-          </div>
-          {form.id && (
-            <div className="text-xs text-slate-500 mt-2">수정 중: #{String(form.id)}</div>
+        {/* 모바일: 카드형 목록 */}
+        <div className="md:hidden grid grid-cols-1 gap-3">
+          {list.map(s => (
+            <div key={String(s.id)} className="rounded-2xl border border-slate-200 bg-white p-4">
+              <div className="flex items-center justify-between">
+                <div className="text-base font-semibold">{s.name}</div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => openEdit(s)}
+                    className="px-2 py-1.5 rounded-lg border border-slate-300 hover:bg-slate-50 text-sm"
+                    title="수정"
+                    aria-label="수정"
+                  >
+                    ✏️
+                  </button>
+                  <button
+                    onClick={() => onDelete(s.id)}
+                    className="px-2 py-1.5 rounded-lg border border-red-300 text-red-600 hover:bg-red-50 text-sm"
+                    title="삭제"
+                    aria-label="삭제"
+                  >
+                    🗑️
+                  </button>
+                </div>
+              </div>
+              <div className="mt-1 text-sm text-slate-600">
+                {/* ‘부관리자 : 부관리자A’ 가 아니라 이름만 */}
+                {managerName(s.managerId)}
+              </div>
+            </div>
+          ))}
+          {list.length === 0 && (
+            <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-6 text-center text-slate-500">
+              등록된 가게가 없습니다.
+            </div>
           )}
         </div>
 
-        {/* 에러 */}
-        {error && <div className="mt-3 text-sm text-red-600">{error}</div>}
-
-        {/* 목록 */}
-        <div className="mt-6 overflow-x-auto bg-white border border-slate-200 rounded-2xl">
+        {/* 데스크탑: 테이블 */}
+        <div className="hidden md:block overflow-x-auto bg-white border border-slate-200 rounded-2xl">
           <table className="min-w-full text-sm">
             <thead className="bg-slate-50">
               <tr>
-                <th className="p-3 text-left">이름</th>
-                <th className="p-3 text-left">위치</th>
-                <th className="p-3 text-left">부관리자</th>
-                <th className="p-3 text-left">작업</th>
+                <th className="p-3 text-left w-[40%]">이름</th>
+                <th className="p-3 text-left w-[40%]">부관리자</th>
+                <th className="p-3 text-left w-[20%]">작업</th>
               </tr>
             </thead>
             <tbody>
-              {rows.map((s) => {
-                const mgr = managers.find((x: any) => x.id === s.manager_id);
-                return (
-                  <tr key={String(s.id)} className="border-t">
-                    <td className="p-3">{s.name}</td>
-                    <td className="p-3">{s.location || '-'}</td>
-                    <td className="p-3">{mgr ? (mgr.nickname || mgr.username) : '-'}</td>
-                    <td className="p-3 flex gap-2">
+              {list.map(s => (
+                <tr key={String(s.id)} className="border-t">
+                  <td className="p-3">{s.name}</td>
+                  <td className="p-3">{managerName(s.managerId)}</td>
+                  <td className="p-3">
+                    <div className="flex items-center gap-2">
                       <button
-                        onClick={() => onEdit(s)}
-                        className="px-2 py-1 rounded-lg bg-slate-900 text-white text-xs"
+                        onClick={() => openEdit(s)}
+                        className="px-2 py-1.5 rounded-lg border border-slate-300 hover:bg-slate-50 text-sm"
+                        title="수정"
+                        aria-label="수정"
                       >
-                        수정
+                        ✏️
                       </button>
                       <button
                         onClick={() => onDelete(s.id)}
-                        className="px-2 py-1 rounded-lg bg-red-600 text-white text-xs"
+                        className="px-2 py-1.5 rounded-lg border border-red-300 text-red-600 hover:bg-red-50 text-sm"
+                        title="삭제"
+                        aria-label="삭제"
                       >
-                        삭제
+                        🗑️
                       </button>
-                    </td>
-                  </tr>
-                );
-              })}
-              {rows.length === 0 && (
-                <tr>
-                  <td className="p-4 text-slate-500" colSpan={4}>
-                    등록된 가게가 없습니다.
+                    </div>
                   </td>
                 </tr>
+              ))}
+              {list.length === 0 && (
+                <tr><td className="p-4 text-slate-500" colSpan={3}>등록된 가게가 없습니다.</td></tr>
               )}
             </tbody>
           </table>
         </div>
+
+        {/* 팝업: 추가/수정 */}
+        <Modal open={open} onClose={close} title={editing ? '가게 수정' : '가게 추가'}>
+          <div className="space-y-3">
+            <div>
+              <label className="block text-xs text-slate-500 mb-1">가게 이름</label>
+              <input
+                value={form.name}
+                onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
+                placeholder="예: 강남점"
+                className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-200"
+              />
+            </div>
+            <div>
+              <label className="block text-xs text-slate-500 mb-1">부관리자</label>
+              <select
+                value={form.managerId as any}
+                onChange={e => setForm(f => ({ ...f, managerId: Number(e.target.value) }))}
+                className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-200"
+              >
+                <option value="" disabled>선택</option>
+                {managers.map(m => (
+                  <option key={m.id} value={m.id}>
+                    {m.nickname || m.username}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="pt-2 flex justify-end gap-2">
+              <button
+                onClick={close}
+                className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-sm px-4 py-2.5"
+              >
+                취소
+              </button>
+              <button
+                onClick={onSave}
+                className="inline-flex items-center gap-2 rounded-xl bg-slate-900 hover:bg-slate-700 text-white text-sm font-medium px-4 py-2.5"
+              >
+                {editing ? '수정 저장' : '추가'}
+              </button>
+            </div>
+          </div>
+        </Modal>
       </PageWrap>
     </ClientGuard>
+  );
+}
+
+function Modal({
+  open, onClose, title, children,
+}: { open: boolean; onClose: () => void; title?: string; children: React.ReactNode }) {
+  if (!open) return null;
+  return (
+    <div className="fixed inset-0 z-50">
+      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
+      <div className="absolute left-1/2 top-1/2 w-[92vw] max-w-lg -translate-x-1/2 -translate-y-1/2">
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-lg overflow-hidden">
+          {title && <div className="px-4 py-3 border-b bg-slate-50 text-sm font-medium">{title}</div>}
+          <div className="p-4">{children}</div>
+        </div>
+      </div>
+    </div>
   );
 }
 ```
@@ -10234,116 +11363,486 @@ export default function StoresPage() {
 
 ```
 'use client';
+
+import React from 'react';
 import ClientGuard from '@/middleware/client-guard';
 import PageWrap from '@/components/PageWrap';
-import React from 'react';
 import { useAuth } from '@/lib/auth';
+import { LS_KEYS, load, save, genId } from '@/lib/storage';
 
-type User = { id: number; username: string; nickname: string; role: 'super_admin'|'manager'|'staff'; manager_id?: number|null };
+type Role = 'super_admin' | 'manager' | 'staff';
+type UserRow = {
+  id: number;
+  username: string;
+  password: string;
+  nickname: string;
+  role: Role;
+  managerId?: number | null;
+};
+
+const roleLabel = (r: Role) =>
+  ({ super_admin: '총관리자', manager: '부관리자', staff: '직원' }[r]);
+
+const includesQ = (s: string, q: string) =>
+  (s || '').toLowerCase().includes(q.toLowerCase());
 
 export default function UsersPage() {
   const { user } = useAuth();
-  if (user?.role !== 'super_admin') {
+
+  // 권한 체크
+  if (!user) return null;
+  if (user.role !== 'super_admin') {
     return (
       <ClientGuard>
-        <PageWrap><div className="text-slate-600">권한이 없습니다.</div></PageWrap>
+        <PageWrap>
+          <h2 className="text-xl font-semibold mb-4">사용자 관리</h2>
+          <div className="text-slate-600">권한이 없습니다.</div>
+        </PageWrap>
       </ClientGuard>
     );
   }
 
-  const [list, setList] = React.useState<User[]>([]);
-  const [form, setForm] = React.useState<{ id?: number; username: string; password: string; nickname: string; role: User['role']; manager_id: number | null }>({
-    username:'', password:'', nickname:'', role:'staff', manager_id: null
+  const [list, setList] = React.useState<UserRow[]>(
+    () => (load<UserRow[]>(LS_KEYS.users) || []) as UserRow[]
+  );
+  const managers = React.useMemo(
+    () => list.filter(u => u.role === 'manager'),
+    [list]
+  );
+
+  // 검색/필터
+  const [q, setQ] = React.useState('');
+  const [roleTab, setRoleTab] = React.useState<Role | 'all'>('all');
+
+  const filtered = React.useMemo(() => {
+    const base =
+      roleTab === 'all' ? list : list.filter(u => u.role === roleTab);
+    if (!q.trim()) return base.sort(byNicknameThenUsername);
+    return base
+      .filter(
+        u =>
+          includesQ(u.nickname, q) ||
+          includesQ(u.username, q) ||
+          includesQ(roleLabel(u.role), q)
+      )
+      .sort(byNicknameThenUsername);
+  }, [list, q, roleTab]);
+
+  // 모달/폼
+  const [open, setOpen] = React.useState(false);
+  const [editing, setEditing] = React.useState<UserRow | null>(null);
+  const [form, setForm] = React.useState<{
+    username: string;
+    password: string;
+    nickname: string;
+    role: Role;
+    managerId: number | '';
+  }>({
+    username: '',
+    password: '',
+    nickname: '',
+    role: 'staff',
+    managerId: managers[0]?.id ?? '',
   });
 
-  const loadUsers = async () => {
-    const res = await fetch('/api/users', { cache: 'no-store' });
-    const json = await res.json();
-    if (!res.ok) throw new Error(json?.error || '사용자 조회 실패');
-    setList(json.rows || []);
+  const persist = (rows: UserRow[]) => {
+    save(LS_KEYS.users, rows);
+    setList(rows);
   };
 
-  React.useEffect(()=>{ loadUsers().catch(console.error); },[]);
-
-  const saveForm = async () => {
-    if (!form.username || (!form.id && !form.password)) return alert('아이디/비밀번호를 입력하세요.');
-    const method = form.id ? 'PATCH' : 'POST';
-    const payload: any = { ...form };
-    if (form.id && !form.password) delete payload.password; // 수정 시 비번 공란이면 변경 없음
-
-    const res = await fetch('/api/users', {
-      method,
-      headers: { 'content-type':'application/json' },
-      body: JSON.stringify(payload)
+  const openCreate = () => {
+    setEditing(null);
+    setForm({
+      username: '',
+      password: '',
+      nickname: '',
+      role: 'staff',
+      managerId: managers[0]?.id ?? '',
     });
-    const json = await res.json();
-    if (!res.ok) return alert(json?.error || '저장 실패');
-
-    setForm({ id: undefined, username:'', password:'', nickname:'', role:'staff', manager_id: null });
-    await loadUsers();
+    setOpen(true);
+  };
+  const openEdit = (row: UserRow) => {
+    setEditing(row);
+    setForm({
+      username: row.username,
+      password: row.password,
+      nickname: row.nickname,
+      role: row.role,
+      managerId: (row.managerId ?? '') as any,
+    });
+    setOpen(true);
+  };
+  const close = () => {
+    setOpen(false);
+    setEditing(null);
   };
 
-  const onEdit = (u: User) => setForm({ id: u.id, username: u.username, password:'', nickname: u.nickname, role: u.role, manager_id: u.manager_id ?? null });
+  const onSave = () => {
+    if (!form.username.trim()) return alert('아이디를 입력하세요.');
+    if (!form.password.trim()) return alert('비밀번호를 입력하세요.');
+    if (!form.nickname.trim()) return alert('닉네임을 입력하세요.');
+    if (form.role === 'staff' && !form.managerId) {
+      return alert('직원은 부관리자를 선택해야 합니다.');
+    }
 
-  const onDelete = async (id: number) => {
+    // 중복 username 방지(수정 중에는 자기 자신 제외)
+    const exists = list.some(
+      u =>
+        u.username.trim().toLowerCase() ===
+          form.username.trim().toLowerCase() && (!editing || u.id !== editing.id)
+    );
+    if (exists) return alert('이미 존재하는 아이디입니다.');
+
+    if (!editing) {
+      const row: UserRow = {
+        id: genId(),
+        username: form.username.trim(),
+        password: form.password,
+        nickname: form.nickname.trim(),
+        role: form.role,
+        managerId: form.role === 'staff' ? Number(form.managerId) : null,
+      };
+      persist([row, ...list]);
+    } else {
+      const next = list.map(u =>
+        u.id === editing.id
+          ? {
+              ...u,
+              username: form.username.trim(),
+              password: form.password,
+              nickname: form.nickname.trim(),
+              role: form.role,
+              managerId: form.role === 'staff' ? Number(form.managerId) : null,
+            }
+          : u
+      );
+      persist(next);
+    }
+    close();
+  };
+
+  const onDelete = (id: number) => {
     if (!confirm('삭제하시겠습니까?')) return;
-    const res = await fetch('/api/users', { method:'DELETE', headers:{'content-type':'application/json'}, body: JSON.stringify({ id }) });
-    const json = await res.json();
-    if (!res.ok) return alert(json?.error || '삭제 실패');
-    await loadUsers();
+    // manager 삭제 시 해당 매니저를 참조하는 staff의 managerId 정리(선택: null)
+    const deleting = list.find(u => u.id === id);
+    let next = list.filter(u => u.id !== id);
+    if (deleting?.role === 'manager') {
+      next = next.map(u =>
+        u.role === 'staff' && u.managerId === id ? { ...u, managerId: null } : u
+      );
+    }
+    persist(next);
   };
 
   return (
     <ClientGuard>
       <PageWrap>
-        <h2 className="text-xl font-semibold mb-4">사용자 관리</h2>
+        {/* 헤더 */}
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-xl font-semibold">사용자 관리</h2>
+          <button
+            onClick={openCreate}
+            className="rounded-xl bg-slate-900 hover:bg-slate-700 text-white text-sm font-medium px-4 py-2.5"
+          >
+            + 사용자 추가
+          </button>
+        </div>
 
-        <div className="bg-white rounded-2xl border border-slate-200 p-4">
-          <div className="grid sm:grid-cols-6 gap-3">
-            <input value={form.username} onChange={e=>setForm(f=>({ ...f, username:e.target.value }))} className="rounded-xl border-slate-300" placeholder="아이디" />
-            <input value={form.password} onChange={e=>setForm(f=>({ ...f, password:e.target.value }))} className="rounded-xl border-slate-300" placeholder={form.id ? '비밀번호(변경 시만)' : '비밀번호'} />
-            <input value={form.nickname} onChange={e=>setForm(f=>({ ...f, nickname:e.target.value }))} className="rounded-xl border-slate-300" placeholder="닉네임" />
-            <select value={form.role} onChange={e=>setForm(f=>({ ...f, role: e.target.value as User['role'] }))} className="rounded-xl border-slate-300">
-              <option value="super_admin">총관리자</option>
-              <option value="manager">부관리자</option>
-              <option value="staff">직원</option>
-            </select>
-            <input type="number" value={form.manager_id ?? ''} onChange={e=>setForm(f=>({ ...f, manager_id: e.target.value ? Number(e.target.value) : null }))} className="rounded-xl border-slate-300" placeholder="부관리자 ID(직원일 때 선택)" />
-            <button onClick={saveForm} className="rounded-xl bg-brand-600 text-white hover:bg-brand-700">{form.id ? '수정' : '추가'}</button>
+        {/* 검색/탭(모바일 우선 카드) */}
+        <div className="bg-white rounded-2xl border border-slate-200 p-4 mb-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <input
+              value={q}
+              onChange={e => setQ(e.target.value)}
+              placeholder="검색 (이름/아이디/역할)"
+              className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-200"
+            />
+            <div className="md:col-span-2">
+              <div className="inline-flex rounded-xl border border-slate-200 bg-slate-50 p-1">
+                {([
+                  { key: 'all', label: '전체' },
+                  { key: 'super_admin', label: '총관리자' },
+                  { key: 'manager', label: '부관리자' },
+                  { key: 'staff', label: '직원' },
+                ] as const).map(t => {
+                  const active = roleTab === (t.key as any);
+                  return (
+                    <button
+                      key={t.key}
+                      onClick={() => setRoleTab(t.key as any)}
+                      className={`px-3 py-1.5 text-sm rounded-lg ${
+                        active
+                          ? 'bg-white border border-slate-200 shadow-sm'
+                          : 'text-slate-600 hover:text-slate-800'
+                      }`}
+                    >
+                      {t.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
           </div>
         </div>
 
-        <div className="mt-6 overflow-x-auto bg-white border border-slate-200 rounded-2xl">
+        {/* 모바일: 카드 리스트 */}
+        <div className="md:hidden grid grid-cols-1 gap-3">
+          {filtered.map(u => (
+            <div
+              key={u.id}
+              className="rounded-2xl border border-slate-200 bg-white p-4"
+            >
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-base font-semibold">
+                    {u.nickname || u.username}
+                  </div>
+                  <div className="text-xs text-slate-500 mt-0.5">
+                    {u.username} · {roleLabel(u.role)}
+                  </div>
+                  {u.role === 'staff' && (
+                    <div className="text-xs text-slate-500 mt-1">
+                      부관리자:{' '}
+                      {managerName(u.managerId, list) || <span className="text-slate-400">미지정</span>}
+                    </div>
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => openEdit(u)}
+                    className="px-2 py-1.5 rounded-lg border border-slate-300 hover:bg-slate-50 text-sm"
+                    title="수정"
+                    aria-label="수정"
+                  >
+                    ✏️
+                  </button>
+                  <button
+                    onClick={() => onDelete(u.id)}
+                    className="px-2 py-1.5 rounded-lg border border-red-300 text-red-600 hover:bg-red-50 text-sm"
+                    title="삭제"
+                    aria-label="삭제"
+                  >
+                    🗑️
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))}
+          {filtered.length === 0 && (
+            <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-6 text-center text-slate-500">
+              사용자 없음
+            </div>
+          )}
+        </div>
+
+        {/* 데스크탑: 표 */}
+        <div className="hidden md:block overflow-x-auto bg-white border border-slate-200 rounded-2xl">
           <table className="min-w-full text-sm">
             <thead className="bg-slate-50">
               <tr>
-                <th className="p-3 text-left">ID</th>
-                <th className="p-3 text-left">아이디</th>
-                <th className="p-3 text-left">닉네임</th>
-                <th className="p-3 text-left">역할</th>
-                <th className="p-3 text-left">부관리자ID</th>
-                <th className="p-3 text-left">작업</th>
+                <th className="p-3 text-left w-[24%]">닉네임</th>
+                <th className="p-3 text-left w-[24%]">아이디</th>
+                <th className="p-3 text-left w-[16%]">역할</th>
+                <th className="p-3 text-left w-[24%]">부관리자</th>
+                <th className="p-3 text-left w-[12%]">작업</th>
               </tr>
             </thead>
             <tbody>
-              {list.map(u=> (
+              {filtered.map(u => (
                 <tr key={u.id} className="border-t">
-                  <td className="p-3">{u.id}</td>
+                  <td className="p-3">{u.nickname || u.username}</td>
                   <td className="p-3">{u.username}</td>
-                  <td className="p-3">{u.nickname}</td>
-                  <td className="p-3">{u.role}</td>
-                  <td className="p-3">{u.manager_id ?? '-'}</td>
-                  <td className="p-3 flex gap-2">
-                    <button onClick={()=>onEdit(u)} className="px-2 py-1 rounded-lg bg-slate-900 text-white text-xs">수정</button>
-                    <button onClick={()=>onDelete(u.id)} className="px-2 py-1 rounded-lg bg-red-600 text-white text-xs">삭제</button>
+                  <td className="p-3">{roleLabel(u.role)}</td>
+                  <td className="p-3">
+                    {u.role === 'staff'
+                      ? managerName(u.managerId, list) || <span className="text-slate-400">미지정</span>
+                      : <span className="text-slate-400">-</span>}
+                  </td>
+                  <td className="p-3">
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => openEdit(u)}
+                        className="px-2.5 py-1.5 rounded-lg border border-slate-300 hover:bg-slate-50 text-xs"
+                        title="수정"
+                        aria-label="수정"
+                      >
+                        ✏️
+                      </button>
+                      <button
+                        onClick={() => onDelete(u.id)}
+                        className="px-2.5 py-1.5 rounded-lg border border-red-300 text-red-600 hover:bg-red-50 text-xs"
+                        title="삭제"
+                        aria-label="삭제"
+                      >
+                        🗑️
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
+              {filtered.length === 0 && (
+                <tr>
+                  <td colSpan={5} className="p-6 text-slate-500">
+                    사용자 없음
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
+
+        {/* 팝업(추가/수정) */}
+        <Modal
+          open={open}
+          onClose={close}
+          title={editing ? '사용자 수정' : '사용자 추가'}
+        >
+          <div className="space-y-3">
+            <div className="grid sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs text-slate-500 mb-1">아이디</label>
+                <input
+                  value={form.username}
+                  onChange={e => setForm(f => ({ ...f, username: e.target.value }))}
+                  placeholder="예: kim"
+                  className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-200"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-slate-500 mb-1">비밀번호</label>
+                <input
+                  value={form.password}
+                  onChange={e => setForm(f => ({ ...f, password: e.target.value }))}
+                  placeholder="8자 이상"
+                  className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-200"
+                />
+              </div>
+            </div>
+
+            <div className="grid sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs text-slate-500 mb-1">닉네임</label>
+                <input
+                  value={form.nickname}
+                  onChange={e => setForm(f => ({ ...f, nickname: e.target.value }))}
+                  placeholder="예: 김직원"
+                  className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-200"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-slate-500 mb-1">역할</label>
+                <select
+                  value={form.role}
+                  onChange={e =>
+                    setForm(f => ({
+                      ...f,
+                      role: e.target.value as Role,
+                      // 역할을 staff이 아닌 것으로 바꾸면 managerId 정리
+                      managerId:
+                        (e.target.value as Role) === 'staff'
+                          ? (f.managerId || managers[0]?.id || '')
+                          : ('' as any),
+                    }))
+                  }
+                  className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-200"
+                >
+                  <option value="super_admin">총관리자</option>
+                  <option value="manager">부관리자</option>
+                  <option value="staff">직원</option>
+                </select>
+              </div>
+            </div>
+
+            {/* 직원일 때만 노출 */}
+            {form.role === 'staff' && (
+              <div>
+                <label className="block text-xs text-slate-500 mb-1">
+                  부관리자
+                </label>
+                <select
+                  value={form.managerId as any}
+                  onChange={e =>
+                    setForm(f => ({
+                      ...f,
+                      managerId: Number(e.target.value),
+                    }))
+                  }
+                  className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-200"
+                >
+                  <option value="" disabled>
+                    선택
+                  </option>
+                  {managers.map(m => (
+                    <option key={m.id} value={m.id}>
+                      {m.nickname || m.username}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            <div className="pt-2 flex justify-end gap-2">
+              <button
+                onClick={close}
+                className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-sm px-4 py-2.5"
+              >
+                취소
+              </button>
+              <button
+                onClick={onSave}
+                className="inline-flex items-center gap-2 rounded-xl bg-slate-900 hover:bg-slate-700 text-white text-sm font-medium px-4 py-2.5"
+              >
+                {editing ? '수정 저장' : '추가'}
+              </button>
+            </div>
+          </div>
+        </Modal>
       </PageWrap>
     </ClientGuard>
+  );
+}
+
+/* ---------- helpers ---------- */
+
+function byNicknameThenUsername(a: UserRow, b: UserRow) {
+  const an = (a.nickname || a.username || '').toLowerCase();
+  const bn = (b.nickname || b.username || '').toLowerCase();
+  return an.localeCompare(bn);
+}
+
+function managerName(managerId: number | null | undefined, users: UserRow[]) {
+  if (!managerId) return '';
+  const m = users.find(u => u.id === managerId);
+  return m ? m.nickname || m.username : '';
+}
+
+/* ---------- Modal ---------- */
+function Modal({
+  open,
+  onClose,
+  title,
+  children,
+}: {
+  open: boolean;
+  onClose: () => void;
+  title?: string;
+  children: React.ReactNode;
+}) {
+  if (!open) return null;
+  return (
+    <div className="fixed inset-0 z-50">
+      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
+      <div className="absolute left-1/2 top-1/2 w-[92vw] max-w-lg -translate-x-1/2 -translate-y-1/2">
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-lg overflow-hidden">
+          {title && (
+            <div className="px-4 py-3 border-b bg-slate-50 text-sm font-medium">
+              {title}
+            </div>
+          )}
+          <div className="p-4">{children}</div>
+        </div>
+      </div>
+    </div>
   );
 }
 ```
@@ -10354,7 +11853,7 @@ export default function UsersPage() {
 import { NextRequest, NextResponse } from 'next/server';
 import { supaSrv } from '@/lib/supabase-server';
 
-// Asia/Seoul 기준 날짜 문자열
+// Asia/Seoul 기준 yyyy-mm-dd (조회 기본값에만 사용)
 const todayKST = () => {
   const now = new Date();
   const kst = new Date(now.getTime() + 9 * 60 * 60 * 1000);
@@ -10382,21 +11881,17 @@ export async function GET(req: NextRequest) {
       if (!userId) return NextResponse.json({ rows: [] }, { status: 200 });
       q = q.eq('user_id', userId);
     } else if (role === 'manager') {
-      // 내 매장 소속만
       const stores = await supaSrv.from('stores').select('id').eq('manager_id', managerId);
       if (stores.error) throw stores.error;
       const ids = (stores.data ?? []).map(s => s.id);
       if (ids.length === 0) return NextResponse.json({ rows: [] }, { status: 200 });
       q = q.in('store_id', ids);
-    } else {
-      // super_admin: 제한 없음
     }
-
     const r = await q;
     if (r.error) throw r.error;
     return NextResponse.json({ rows: r.data ?? [] }, { status: 200 });
-  } catch (e:any) {
-    return NextResponse.json({ error: e.message || 'attendance get failed' }, { status: 500 });
+  } catch (e: any) {
+    return NextResponse.json({ error: e?.message || 'attendance get failed', detail: String(e) }, { status: 500 });
   }
 }
 
@@ -10404,26 +11899,30 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const userId = Number(body.userId);
-    const storeId = String(body.storeId || '');
+    const storeId = (body.storeId ?? '').toString().trim(); // uuid면 문자열 그대로
     if (!userId || !storeId) {
       return NextResponse.json({ error: 'userId/storeId required' }, { status: 400 });
     }
 
     const now = new Date().toISOString();
-    const workDate = todayKST(); // KST 기준으로 work_date 세팅
-
-    const ins = await supaSrv.from('attendance').insert({
+    // ⚠ work_date는 DB DEFAULT/GNERATED 컬럼일 수 있으므로 넣지 않는다.
+    const payload = {
       user_id: userId,
       store_id: storeId,
       check_in_at: now,
       total_hours: 0,
-      work_date: workDate
-    }).select('id,user_id,store_id,check_in_at,check_out_at,total_hours,work_date').single();
+    };
+
+    const ins = await supaSrv
+      .from('attendance')
+      .insert(payload)
+      .select('id,user_id,store_id,check_in_at,check_out_at,total_hours,work_date')
+      .single();
 
     if (ins.error) throw ins.error;
     return NextResponse.json({ row: ins.data }, { status: 201 });
-  } catch (e:any) {
-    return NextResponse.json({ error: e.message || 'attendance post failed' }, { status: 500 });
+  } catch (e: any) {
+    return NextResponse.json({ error: e?.message || 'attendance post failed', detail: String(e) }, { status: 500 });
   }
 }
 
@@ -10433,10 +11932,11 @@ export async function PATCH(req: NextRequest) {
     const id = Number(body.id);
     if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 });
 
-    // 미완료 레코드 조회
-    const found = await supaSrv.from('attendance')
+    const found = await supaSrv
+      .from('attendance')
       .select('id,check_in_at,check_out_at,total_hours')
-      .eq('id', id).single();
+      .eq('id', id)
+      .single();
     if (found.error) throw found.error;
     if (!found.data) return NextResponse.json({ error: 'not found' }, { status: 404 });
     if (found.data.check_out_at) {
@@ -10446,16 +11946,20 @@ export async function PATCH(req: NextRequest) {
     const out = new Date();
     const hours = Math.max(0, (out.getTime() - new Date(found.data.check_in_at).getTime()) / 36e5);
 
-    const upd = await supaSrv.from('attendance')
-      .update({ check_out_at: out.toISOString(), total_hours: Number(hours.toFixed(2)) })
+    const upd = await supaSrv
+      .from('attendance')
+      .update({
+        check_out_at: out.toISOString(),
+        total_hours: Number(hours.toFixed(2)),
+      })
       .eq('id', id)
       .select('id,user_id,store_id,check_in_at,check_out_at,total_hours,work_date')
       .single();
 
     if (upd.error) throw upd.error;
     return NextResponse.json({ row: upd.data }, { status: 200 });
-  } catch (e:any) {
-    return NextResponse.json({ error: e.message || 'attendance patch failed' }, { status: 500 });
+  } catch (e: any) {
+    return NextResponse.json({ error: e?.message || 'attendance patch failed', detail: String(e) }, { status: 500 });
   }
 }
 ```
@@ -10687,12 +12191,142 @@ export async function DELETE(req: Request, { params }: { params: { id: string } 
 }
 ```
 
+===== FILE: src\app\api\sales\route.ts =====
+
+```
+import { NextRequest, NextResponse } from 'next/server';
+import { supaSrv } from '@/lib/supabase-server';
+
+const isUuid = (v: any) =>
+  typeof v === 'string' &&
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(v);
+
+function ensureDate(d: any): string {
+  if (typeof d !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(d)) {
+    throw new Error('date must be YYYY-MM-DD');
+  }
+  return d;
+}
+function ensureStoreUuid(storeId: any): string {
+  if (!isUuid(storeId)) throw new Error('storeId must be uuid');
+  return String(storeId);
+}
+
+const fields =
+  'id,user_id,store_id,sale_date,amount,cnt,incentive,note,created_at,updated_at';
+
+async function resolveUserUuid(idOrUuid: any): Promise<string> {
+  if (isUuid(idOrUuid)) return String(idOrUuid);
+  const legacy = Number(idOrUuid);
+  if (!Number.isFinite(legacy) || legacy <= 0) throw new Error('invalid userId');
+
+  const got = await supaSrv
+    .from('user_uuid_map')
+    .select('user_uuid')
+    .eq('legacy_id', legacy)
+    .maybeSingle();
+  if (got.error) throw got.error;
+
+  if (got.data?.user_uuid) return String(got.data.user_uuid);
+
+  const gen =
+    (globalThis.crypto?.randomUUID?.() ?? require('crypto').randomUUID()).toString();
+  const ins = await supaSrv
+    .from('user_uuid_map')
+    .insert({ legacy_id: legacy, user_uuid: gen })
+    .select('user_uuid')
+    .single();
+  if (ins.error) throw ins.error;
+
+  return String(ins.data.user_uuid);
+}
+
+/** ---------- GET ---------- */
+export async function GET(req: NextRequest) {
+  try {
+    const url = new URL(req.url);
+    const role = (url.searchParams.get('role') || 'staff') as 'staff'|'manager'|'super_admin';
+    const userIdLegacy = Number(url.searchParams.get('userId') || '0');
+    const managerIdLegacy = Number(url.searchParams.get('managerId') || '0');
+    const storeId = url.searchParams.get('storeId');
+    const dateFrom = ensureDate(url.searchParams.get('dateFrom') || '');
+    const dateTo   = ensureDate(url.searchParams.get('dateTo') || '');
+
+    let q = supaSrv
+      .from('sales')
+      .select(fields)
+      .gte('sale_date', dateFrom)
+      .lte('sale_date', dateTo)
+      .order('sale_date', { ascending: false });
+
+    if (storeId) {
+      if (!isUuid(storeId)) {
+        return NextResponse.json({ error: 'storeId must be uuid' }, { status: 400 });
+      }
+      q = q.eq('store_id', storeId);
+    }
+
+    if (role === 'staff') {
+      if (!userIdLegacy) return NextResponse.json({ rows: [] }, { status: 200 });
+      const userUuid = await resolveUserUuid(userIdLegacy);
+      q = q.eq('user_id', userUuid);
+    } else if (role === 'manager') {
+      if (!managerIdLegacy) return NextResponse.json({ rows: [] }, { status: 200 });
+      const stores = await supaSrv
+        .from('stores')
+        .select('id')
+        .eq('manager_id', managerIdLegacy);
+      if (stores.error) throw stores.error;
+      const ids = (stores.data ?? []).map(s => s.id);
+      if (!ids.length) return NextResponse.json({ rows: [] }, { status: 200 });
+      q = q.in('store_id', ids);
+    }
+
+    const r = await q;
+    if (r.error) throw r.error;
+    const rows = (r.data ?? []) as Array<{ user_id: string }>;
+
+    // ---- 여기서 uuid -> legacy 매핑 붙여준다 ----
+    const uuids = Array.from(new Set(rows.map(x => x.user_id).filter(isUuid)));
+    let legacyMap: Record<string, number> = {};
+    if (uuids.length) {
+      const mapRes = await supaSrv
+        .from('user_uuid_map')
+        .select('legacy_id,user_uuid')
+        .in('user_uuid', uuids);
+      if (mapRes.error) throw mapRes.error;
+      legacyMap = (mapRes.data ?? []).reduce<Record<string, number>>((acc, cur:any) => {
+        acc[String(cur.user_uuid)] = Number(cur.legacy_id);
+        return acc;
+      }, {});
+    }
+
+    const enriched = rows.map(row => ({
+      ...row,
+      legacy_user_id: legacyMap[row.user_id] ?? null, // ← 프론트에서 이름 매칭용
+    }));
+
+    return NextResponse.json({ rows: enriched }, { status: 200 });
+  } catch (e: any) {
+    console.error('[GET /api/sales] err:', e?.message, e);
+    return NextResponse.json({ error: e?.message || 'sales get failed' }, { status: 500 });
+  }
+}
+
+/** ---------- POST / PATCH / DELETE (변경 없음) ---------- */
+export async function POST() { /* ... 기존 그대로 ... */ throw new Error('keep your existing POST/PATCH/DELETE here'); }
+export async function PATCH() { /* ... 기존 그대로 ... */ throw new Error('keep your existing POST/PATCH/DELETE here'); }
+export async function DELETE() { /* ... 기존 그대로 ... */ throw new Error('keep your existing POST/PATCH/DELETE here'); }
+
+```
+
 ===== FILE: src\app\api\schedules\route.ts =====
 
 ```
 import { NextRequest, NextResponse } from 'next/server';
 import { supaSrv } from '@/lib/supabase-server';
 
+// GET /api/schedules?role=&userId=&managerId=&dateFrom=&dateTo=
 export async function GET(req: NextRequest) {
   try {
     const url = new URL(req.url);
@@ -10702,97 +12336,105 @@ export async function GET(req: NextRequest) {
     const dateFrom = url.searchParams.get('dateFrom')!;
     const dateTo   = url.searchParams.get('dateTo')!;
 
-    let q = supaSrv.from('schedules')
+    let q = supaSrv
+      .from('schedules')
       .select('id,user_id,store_id,start_at,end_at,work_date')
-      .order('start_at', { ascending: false })
+      .gte('work_date', dateFrom)
+      .lte('work_date', dateTo)
+      .order('start_at', { ascending: true })
       .limit(500);
 
-    if (dateFrom) q = q.gte('work_date', dateFrom);
-    if (dateTo)   q = q.lte('work_date', dateTo);
-
     if (role === 'staff') {
+      if (!userId) return NextResponse.json({ rows: [] }, { status: 200 });
       q = q.eq('user_id', userId);
     } else if (role === 'manager') {
       const stores = await supaSrv.from('stores').select('id').eq('manager_id', managerId);
       if (stores.error) throw stores.error;
-      const ids = (stores.data ?? []).map(s=>s.id);
+      const ids = (stores.data ?? []).map(s => s.id);
       if (ids.length === 0) return NextResponse.json({ rows: [] }, { status: 200 });
       q = q.in('store_id', ids);
     }
     const r = await q;
     if (r.error) throw r.error;
     return NextResponse.json({ rows: r.data ?? [] }, { status: 200 });
-  } catch (e:any) {
-    return NextResponse.json({ error: e.message || 'schedules get failed' }, { status: 500 });
+  } catch (e: any) {
+    return NextResponse.json({ error: e?.message || 'schedules get failed', detail: String(e) }, { status: 500 });
   }
 }
 
+// POST /api/schedules { userId, storeId, startAt, endAt }
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const userId  = Number(body.userId);
-    const storeId = String(body.storeId || '');
-    const startAt = String(body.startAt || '');
-    const endAt   = String(body.endAt || '');
+    const storeId = (body.storeId ?? '').toString().trim();
+    const startAt = (body.startAt ?? '').toString();
+    const endAt   = (body.endAt ?? '').toString();
     if (!userId || !storeId || !startAt || !endAt) {
-      return NextResponse.json({ error: 'missing fields' }, { status: 400 });
+      return NextResponse.json({ error: 'userId/storeId/startAt/endAt required' }, { status: 400 });
     }
-    if (new Date(endAt) <= new Date(startAt)) {
-      return NextResponse.json({ error: 'end must be after start' }, { status: 400 });
+    if (new Date(endAt).getTime() <= new Date(startAt).getTime()) {
+      return NextResponse.json({ error: 'endAt must be after startAt' }, { status: 400 });
     }
 
-    const workDate = (new Date(startAt)).toISOString().slice(0,10); // UTC 기준 work_date
-    const ins = await supaSrv.from('schedules').insert({
-      user_id: userId,
-      store_id: storeId,
-      start_at: startAt,
-      end_at: endAt,
-      work_date: workDate
-    }).select('id,user_id,store_id,start_at,end_at,work_date').single();
+    // ⚠ work_date는 DB DEFAULT/GNERATED 컬럼이면 넣지 않는다.
+    const ins = await supaSrv
+      .from('schedules')
+      .insert({ user_id: userId, store_id: storeId, start_at: startAt, end_at: endAt })
+      .select('id,user_id,store_id,start_at,end_at,work_date')
+      .single();
 
     if (ins.error) throw ins.error;
     return NextResponse.json({ row: ins.data }, { status: 201 });
-  } catch (e:any) {
-    return NextResponse.json({ error: e.message || 'schedules post failed' }, { status: 500 });
+  } catch (e: any) {
+    return NextResponse.json({ error: e?.message || 'schedules post failed', detail: String(e) }, { status: 500 });
   }
 }
 
+// PATCH /api/schedules { id, storeId?, startAt?, endAt? }
 export async function PATCH(req: NextRequest) {
   try {
     const body = await req.json();
-    const id = String(body.id || '');
-    const storeId = String(body.storeId || '');
-    const startAt = String(body.startAt || '');
-    const endAt   = String(body.endAt || '');
-    if (!id || !storeId || !startAt || !endAt) {
-      return NextResponse.json({ error: 'missing fields' }, { status: 400 });
-    }
-    if (new Date(endAt) <= new Date(startAt)) {
-      return NextResponse.json({ error: 'end must be after start' }, { status: 400 });
-    }
-    const workDate = (new Date(startAt)).toISOString().slice(0,10);
+    const id = body.id?.toString();
+    if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 });
 
-    const upd = await supaSrv.from('schedules').update({
-      store_id: storeId, start_at: startAt, end_at: endAt, work_date: workDate
-    }).eq('id', id).select('id,user_id,store_id,start_at,end_at,work_date').single();
+    const updates: any = {};
+    if (body.storeId !== undefined) updates.store_id = body.storeId.toString().trim();
+    if (body.startAt !== undefined) updates.start_at = body.startAt.toString();
+    if (body.endAt !== undefined)   updates.end_at   = body.endAt.toString();
+
+    if (updates.start_at && updates.end_at) {
+      if (new Date(updates.end_at).getTime() <= new Date(updates.start_at).getTime()) {
+        return NextResponse.json({ error: 'endAt must be after startAt' }, { status: 400 });
+      }
+    }
+
+    const upd = await supaSrv
+      .from('schedules')
+      .update(updates)
+      .eq('id', id)
+      .select('id,user_id,store_id,start_at,end_at,work_date')
+      .single();
 
     if (upd.error) throw upd.error;
     return NextResponse.json({ row: upd.data }, { status: 200 });
-  } catch (e:any) {
-    return NextResponse.json({ error: e.message || 'schedules patch failed' }, { status: 500 });
+  } catch (e: any) {
+    return NextResponse.json({ error: e?.message || 'schedules patch failed', detail: String(e) }, { status: 500 });
   }
 }
 
+// DELETE /api/schedules { id }
 export async function DELETE(req: NextRequest) {
   try {
     const body = await req.json();
-    const id = String(body.id || '');
+    const id = body.id?.toString();
     if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 });
+
     const del = await supaSrv.from('schedules').delete().eq('id', id);
     if (del.error) throw del.error;
     return NextResponse.json({ ok: true }, { status: 200 });
-  } catch (e:any) {
-    return NextResponse.json({ error: e.message || 'schedules delete failed' }, { status: 500 });
+  } catch (e: any) {
+    return NextResponse.json({ error: e?.message || 'schedules delete failed', detail: String(e) }, { status: 500 });
   }
 }
 ```
@@ -11305,15 +12947,13 @@ export default function NotificationsPopover() {
 ===== FILE: src\components\PageWrap.tsx =====
 
 ```
-// 6-1 PageWrap — roomy container
-export default function PageWrap({ children }: { children: React.ReactNode }) {
+export default function PageWrap({ children }: { children?: React.ReactNode }) {
   return (
     <div className="p-4 sm:p-6 lg:p-8">
-      <div className="max-w-7xl mx-auto">{children}</div>
+      <div className="max-w-6xl mx-auto">{children}</div>
     </div>
   );
 }
-
 ```
 
 ===== FILE: src\components\Sidebar.tsx =====
@@ -11329,7 +12969,7 @@ import { canSeeManagerMenus, isSuperAdmin } from '@/lib/rbac';
 import type { LucideIcon } from 'lucide-react';
 import {
   LayoutDashboard, Clock8, Calendar, Megaphone, Bell, Trophy,
-  PackageSearch, Receipt, Building2, Users, MessageSquare, X
+  PackageSearch, Receipt, Building2, Users, Wallet, MessageSquare, X
 } from 'lucide-react';
 
 type Item = {
@@ -11354,14 +12994,15 @@ export default function Sidebar() {
   if (!user) return null;
 
   const base: Item[] = [
-    { href: '/dashboard', label: '대시보드', icon: LayoutDashboard },
+    { href: '/dashboard', label: '홈', icon: LayoutDashboard },
+    { href: '/notices', label: '공지', icon: Megaphone },
     { href: '/attendance', label: '출퇴근', icon: Clock8 },
     { href: '/schedule', label: '스케줄', icon: Calendar },
-    { href: '/notices', label: '공지', icon: Megaphone },
+    { href: '/sales', label: '매출', icon: Wallet },
     { href: '/calls', label: '호출', icon: Bell },
     { href: '/rankings', label: '랭킹', icon: Trophy },
     { href: '/lost', label: '분실물', icon: PackageSearch },
-    { href: '/messages', label: '쪽지', icon: MessageSquare }, // ✅ 복구
+    { href: '/messages', label: '채팅', icon: MessageSquare }, // ✅ 복구
   ];
 
   const managerOnly: Item[] = [{ href: '/debts', label: '미수금 관리', icon: Receipt }];
@@ -11900,12 +13541,14 @@ export function onLS(a: any, b?: any): () => void {
 ```
 import { createClient } from '@supabase/supabase-js';
 
+// ⚠️ .env.local 에 있는 키 이름과 맞추세요.
+const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;   // ← 중요: 공개 URL 사용
 const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-const url = process.env.SUPABASE_URL!;
 
 export const supaSrv = createClient(url, serviceKey, {
   auth: { persistSession: false },
 });
+
 ```
 
 ===== FILE: src\middleware\client-guard.tsx =====
