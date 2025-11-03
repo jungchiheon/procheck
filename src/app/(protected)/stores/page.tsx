@@ -48,22 +48,55 @@ export default function StoresPage() {
   };
   const close = () => { setOpen(false); setEditing(null); };
 
-  const onSave = () => {
+  const onSave = async () => {
     if (!form.name.trim()) return alert('가게 이름을 입력하세요.');
     if (!form.managerId) return alert('부관리자를 선택하세요.');
-    if (!editing) {
-      const row: StoreRow = { id: genId(), name: form.name.trim(), managerId: Number(form.managerId) };
-      persist([row, ...list]);
-    } else {
-      const next = list.map(s => s.id === editing.id ? { ...s, name: form.name.trim(), managerId: Number(form.managerId) } : s);
-      persist(next);
+    
+    try {
+      if (!editing) {
+        const res = await fetch('/api/store', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: form.name.trim(),
+            manager_id: Number(form.managerId),
+          }),
+        });
+        const { row } = await res.json();
+        const newRow: StoreRow = { id: row.id, name: row.name, managerId: row.manager_id };
+        persist([newRow, ...list]);
+      } else {
+        const res = await fetch('/api/store', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            id: editing.id,
+            name: form.name.trim(),
+            manager_id: Number(form.managerId),
+          }),
+        });
+        const { row } = await res.json();
+        const next = list.map(s => s.id === editing.id ? { id: row.id, name: row.name, managerId: row.manager_id } : s);
+        persist(next);
+      }
+      close();
+    } catch (error) {
+      alert('오류가 발생했습니다.');
     }
-    close();
   };
 
-  const onDelete = (id: StoreRow['id']) => {
+  const onDelete = async (id: StoreRow['id']) => {
     if (!confirm('삭제하시겠습니까?')) return;
-    persist(list.filter(s => s.id !== id));
+    try {
+      await fetch('/api/store', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id }),
+      });
+      persist(list.filter(s => s.id !== id));
+    } catch (error) {
+      alert('오류가 발생했습니다.');
+    }
   };
 
   const managerName = (id: number) => {
