@@ -106,13 +106,7 @@ export default function LoginPage() {
               <div className="flex items-start justify-between">
                 <div>
                   <h1 className="text-lg font-semibold text-white">로그인</h1>
-                  <p className="mt-1 text-sm text-white/60">
-                    로그인ID와 비밀번호를 입력하세요.
-                  </p>
                 </div>
-                <span className="text-xs text-white/50 border border-white/15 bg-white/5 rounded-full px-2 py-1">
-                  Secure
-                </span>
               </div>
 
               {/* 2-9) 입력 폼 */}
@@ -128,7 +122,7 @@ export default function LoginPage() {
 
                       value={loginId}
                       onChange={(e) => setLoginId(e.target.value)}
-                      placeholder="admin01 / staff03"
+                      placeholder="ID"
                       autoComplete="username"
                     />
                   </div>
@@ -171,7 +165,7 @@ export default function LoginPage() {
 
                 {/* 2-10) 하단 안내(과하지 않게) */}
                 <div className="pt-2 text-xs text-white/45 leading-5">
-                  관리자/직원 계정은 관리자 화면에서 생성됩니다. 문제가 있으면 관리자에게 문의하세요.
+                  문의 : 010-1234-1234
                 </div>
               </div>
             </div>
