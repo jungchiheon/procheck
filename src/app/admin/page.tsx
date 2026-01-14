@@ -23,7 +23,6 @@ export default function AdminHomePage() {
       {/* 3-3) 헤더 */}
       <PageHeader
         title="관리자 메인"
-        subtitle="업무 메모와 직원 관리를 빠르게 처리합니다."
         right={<ProButton variant="ghost" onClick={onLogout}>로그아웃</ProButton>}
       />
 
