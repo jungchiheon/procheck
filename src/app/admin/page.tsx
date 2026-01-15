@@ -6,6 +6,7 @@ import { supabaseClient } from '@/lib/supabaseClient'
 import { GlassCard } from '@/components/ui/GlassCard'
 import { PageHeader } from '@/components/ui/PageHeader'
 import { ProButton } from '@/components/ui/ProButton'
+import { AdminNotificationBell } from '@/components/AdminNotificationBell' // 3-0) 알림벨 추가
 import { ClipboardList, Users } from 'lucide-react'
 
 export default function AdminHomePage() {
@@ -23,7 +24,16 @@ export default function AdminHomePage() {
       {/* 3-3) 헤더 */}
       <PageHeader
         title="관리자 메인"
-        right={<ProButton variant="ghost" onClick={onLogout}>로그아웃</ProButton>}
+        right={
+          <div className="flex items-center gap-2">
+            {/* 3-3-1) 알림벨 */}
+            <AdminNotificationBell />
+            {/* 3-3-2) 로그아웃 */}
+            <ProButton variant="ghost" onClick={onLogout}>
+              로그아웃
+            </ProButton>
+          </div>
+        }
       />
 
       {/* 3-4) 메인 카드 */}
@@ -33,6 +43,7 @@ export default function AdminHomePage() {
           <button
             onClick={() => router.push('/admin/work')}
             className="group rounded-2xl border border-white/10 bg-white/5 p-5 text-left hover:bg-white/10 transition"
+            type="button"
           >
             <div className="flex items-center gap-3">
               <div className="h-10 w-10 rounded-xl border border-white/10 bg-black/20 flex items-center justify-center">
@@ -49,6 +60,7 @@ export default function AdminHomePage() {
           <button
             onClick={() => router.push('/admin/staff')}
             className="group rounded-2xl border border-white/10 bg-white/5 p-5 text-left hover:bg-white/10 transition"
+            type="button"
           >
             <div className="flex items-center gap-3">
               <div className="h-10 w-10 rounded-xl border border-white/10 bg-black/20 flex items-center justify-center">
