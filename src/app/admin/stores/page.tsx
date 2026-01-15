@@ -126,7 +126,7 @@ export default function AdminStoresPage() {
     setError(null)
     setMessage(null)
 
-    const ok = window.confirm('이 가게를 비활성화할까요? (목록에서 숨겨집니다)')
+    const ok = window.confirm('삭제하시겠습니까?')
     if (!ok) return
 
     setDeletingId(storeId)
@@ -137,15 +137,15 @@ export default function AdminStoresPage() {
         .eq('id', storeId)
         .select('id')
 
-      if (upErr) throw new Error(`1-7) 비활성화 실패: ${upErr.message}`)
+      if (upErr) throw new Error(`1-7) 삭제 실패: ${upErr.message}`)
       if (!updatedRows || updatedRows.length === 0) {
-        throw new Error('1-7) 비활성화 권한이 없거나 대상이 없습니다(RLS 가능성).')
+        throw new Error('삭제 권한이 없거나 대상이 없습니다(RLS 가능성).')
       }
 
-      setMessage('비활성화되었습니다.')
+      setMessage('삭제되었습니다.')
       await fetchStores()
     } catch (e: any) {
-      setError(e?.message ?? '1-7) 오류')
+      setError(e?.message ?? '오류')
     } finally {
       setDeletingId(null)
     }
@@ -234,7 +234,7 @@ export default function AdminStoresPage() {
                 type="button"
               >
                 <Trash2 className="h-4 w-4" />
-                {deletingId === s.id ? '처리 중...' : '비활성화'}
+                {deletingId === s.id ? '처리 중...' : ''}
               </button>
             </div>
           ))}

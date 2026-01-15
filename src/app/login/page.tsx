@@ -47,7 +47,7 @@ export default function LoginPage() {
       // 실패하면 staff로 시도
       if (err1) {
         const err2 = await trySignIn(staffEmail)
-        if (err2) throw new Error(`로그인 실패: ${err2.message}`)
+        if (err2) throw new Error(`로그인 실패`)
       }
 
       // 로그인 성공 후 유저 확인

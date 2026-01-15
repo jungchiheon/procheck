@@ -50,11 +50,11 @@ export default function AdminStaffDetailPage() {
   const [error, setError] = useState<string | null>(null)
 
   // 1-3) 입력 폼 상태
-  const [storeQuery, setStoreQuery] = useState('') // 1-3-1) "가게 선택" 입력 하나로 통일
-  const [selectedStoreId, setSelectedStoreId] = useState<number | ''>('') // 1-3-2) 실제 선택된 store_id
-  const [storeDropdownOpen, setStoreDropdownOpen] = useState(false) // 1-3-3) 드롭다운 표시
+  const [storeQuery, setStoreQuery] = useState('')
+  const [selectedStoreId, setSelectedStoreId] = useState<number | ''>('')
+  const [storeDropdownOpen, setStoreDropdownOpen] = useState(false)
 
-  const [workTime, setWorkTime] = useState(getTimeHHMM()) // 1-3-4) 날짜 제거, 시간만
+  const [workTime, setWorkTime] = useState(getTimeHHMM())
   const [minutes, setMinutes] = useState(0)
   const [optionHeart, setOptionHeart] = useState(false)
   const [optionAt, setOptionAt] = useState(false)
@@ -70,6 +70,13 @@ export default function AdminStaffDetailPage() {
   const [bankHolder, setBankHolder] = useState('')
   const [bankSaving, setBankSaving] = useState(false)
 
+  // ✅ 출퇴근 설정 모달 상태(일단 UI 트리거는 없음)
+  const [attOpen, setAttOpen] = useState(false)
+  const [checkinLocal, setCheckinLocal] = useState('')
+  const [checkoutLocal, setCheckoutLocal] = useState('')
+  const [attSaving, setAttSaving] = useState(false)
+  const [attError, setAttError] = useState<string | null>(null)
+
   // 1-5) 금액 계산(30분=15000 => 1분=500)
   const amount = useMemo(() => minutes * 500, [minutes])
 
@@ -79,48 +86,33 @@ export default function AdminStaffDetailPage() {
     return toKstDateString(staff.last_checkin_at)
   }, [staff?.last_checkin_at])
 
-  // 1-7) 근무중 판정
-  const workingStatus = useMemo(() => {
-    if (!staff) return { label: '대기 중', detail: '' }
-
-    const ci = staff.last_checkin_at ? new Date(staff.last_checkin_at) : null
-    const co = staff.last_checkout_at ? new Date(staff.last_checkout_at) : null
-
-    if (ci && (!co || ci > co)) return { label: '근무 중', detail: `출근: ${toKstTime(ci)}` }
-    if (co) return { label: '퇴근', detail: `퇴근: ${toKstTime(co)}` }
-    return { label: '대기 중', detail: '' }
-  }, [staff])
-
-  // 1-8) 가게 필터(초성 검색 포함)
+  // 1-7) 가게 필터(초성 검색 포함)
   const filteredStores = useMemo(() => {
-  const q = storeQuery.trim()
-  const active = stores.filter((s) => s.is_active)
-  if (!q) return active
+    const q = storeQuery.trim()
+    const active = stores.filter((s) => s.is_active)
+    if (!q) return active
 
-  // 2-3-1) 초성 1글자 입력이면 "앞글자(첫 한글)의 초성"만 매칭
-  if (isSingleChosung(q)) {
+    if (isSingleChosung(q)) {
+      return active
+        .filter((s) => getLeadingHangulChosung(s.name) === q)
+        .sort((a, b) => a.name.localeCompare(b.name, 'ko'))
+    }
+
+    const qLower = q.toLowerCase()
     return active
-      .filter((s) => getLeadingHangulChosung(s.name) === q)
-      .sort((a, b) => a.name.localeCompare(b.name, 'ko'))
-  }
+      .filter((s) => s.name.toLowerCase().includes(qLower))
+      .sort((a, b) => {
+        const aStarts = a.name.toLowerCase().startsWith(qLower) ? 0 : 1
+        const bStarts = b.name.toLowerCase().startsWith(qLower) ? 0 : 1
+        if (aStarts !== bStarts) return aStarts - bStarts
+        return a.name.localeCompare(b.name, 'ko')
+      })
+  }, [stores, storeQuery])
 
-  // 2-3-2) 그 외(일반 문자열)는 "앞부분 우선" 정렬로 보여주기
-  const qLower = q.toLowerCase()
-  return active
-    .filter((s) => s.name.toLowerCase().includes(qLower))
-    .sort((a, b) => {
-      const aStarts = a.name.toLowerCase().startsWith(qLower) ? 0 : 1
-      const bStarts = b.name.toLowerCase().startsWith(qLower) ? 0 : 1
-      if (aStarts !== bStarts) return aStarts - bStarts
-      return a.name.localeCompare(b.name, 'ko')
-    })
-}, [stores, storeQuery])
-
-
-  // 1-9) 근무 내역 총합(기준일)
+  // 1-8) 근무 내역 총합(기준일)
   const totalMinutes = useMemo(() => workLogs.reduce((sum, w) => sum + (w.minutes || 0), 0), [workLogs])
 
-  // 1-10) 초기 로드
+  // 1-9) 초기 로드
   useEffect(() => {
     ;(async () => {
       setLoading(true)
@@ -128,40 +120,40 @@ export default function AdminStaffDetailPage() {
       setMessage(null)
 
       try {
-        // 1-10-1) 토큰 확보
+        // 1-9-1) 토큰 확보
         const { data: session } = await supabaseClient.auth.getSession()
         const token = session.session?.access_token
-        if (!token) throw new Error('1-10-1) 세션이 없습니다. 다시 로그인 해주세요.')
+        if (!token) throw new Error('1-9-1) 세션이 없습니다. 다시 로그인 해주세요.')
 
-        // 1-10-2) staff(API: service role)
+        // 1-9-2) staff(API: service role)
         const res = await fetch(`/api/admin/staff/${staffId}`, {
           headers: { Authorization: `Bearer ${token}` },
         })
         const json = await res.json().catch(() => ({}))
-        if (!res.ok) throw new Error(json?.error || '1-10-2) staff 조회 실패')
+        if (!res.ok) throw new Error(json?.error || '1-9-2) staff 조회 실패')
 
         const staffData = json.staff as Staff
         setStaff(staffData)
 
-        // 1-10-3) ★ 계좌 모달 기본값
+        // 1-9-3) ★ 계좌 모달 기본값
         setBankName(staffData.bank_name ?? '')
         setBankAccount(staffData.bank_account ?? '')
         setBankHolder(staffData.bank_holder ?? '')
 
-        // 1-10-4) stores 로드
+        // 1-9-4) stores 로드
         const { data: storesData, error: storesErr } = await supabaseClient
           .from('stores')
           .select('id, name, is_active')
           .order('name', { ascending: true })
 
-        if (storesErr) throw new Error(`1-10-4) stores 로드 실패: ${storesErr.message}`)
+        if (storesErr) throw new Error(`1-9-4) stores 로드 실패: ${storesErr.message}`)
         setStores((storesData as StoreRow[]) ?? [])
 
-        // 1-10-5) 근무 내역 로드(기준일)
+        // 1-9-5) 근무 내역 로드(기준일)
         const targetDate = staffData.last_checkin_at ? toKstDateString(staffData.last_checkin_at) : getKstDateString()
         await fetchWorkLogs(staffData.id, targetDate)
       } catch (e: any) {
-        setError(e?.message ?? '1-10) 오류')
+        setError(e?.message ?? '1-9) 오류')
       } finally {
         setLoading(false)
       }
@@ -169,7 +161,7 @@ export default function AdminStaffDetailPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [staffId])
 
-  // 1-11) 근무 내역 로드 함수(날짜 범위 필터)
+  // 1-10) 근무 내역 로드 함수(날짜 범위 필터)
   const fetchWorkLogs = async (sid: string, ymd: string) => {
     const { startIso, endIso } = getKstDayRangeIso(ymd)
 
@@ -181,11 +173,11 @@ export default function AdminStaffDetailPage() {
       .lt('work_at', endIso)
       .order('work_at', { ascending: true })
 
-    if (error) throw new Error(`1-11) work_logs 로드 실패: ${error.message}`)
+    if (error) throw new Error(`1-10) work_logs 로드 실패: ${error.message}`)
     setWorkLogs((data as any) ?? [])
   }
 
-  // 1-12) 입력 초기화
+  // 1-11) 입력 초기화
   const resetForm = () => {
     setMinutes(0)
     setOptionHeart(false)
@@ -193,33 +185,88 @@ export default function AdminStaffDetailPage() {
     setMemo('')
   }
 
-  // 1-13) 가게 선택 처리(입력+선택 합침)
+  // 1-12) 가게 선택 처리
   const onPickStore = (s: StoreRow) => {
-    // 1-13-1) 선택한 가게 id 저장
     setSelectedStoreId(s.id)
-    // 1-13-2) 입력칸에는 가게명 표시(선택된 느낌)
     setStoreQuery(s.name)
-    // 1-13-3) 드롭다운 닫기
     setStoreDropdownOpen(false)
   }
 
-  // 1-14) 저장(근무 + 정산)
+  // ✅ 출퇴근 저장 로직(현재 UI 트리거는 없지만 모달은 유지)
+  const openAttendanceModal = () => {
+    if (!staff) return
+    setAttError(null)
+    setCheckinLocal(isoToLocalInput(staff.last_checkin_at))
+    setCheckoutLocal(isoToLocalInput(staff.last_checkout_at))
+    setAttOpen(true)
+  }
+
+  const onSaveAttendance = async () => {
+    if (!staff) return
+    setAttSaving(true)
+    setAttError(null)
+    setError(null)
+    setMessage(null)
+
+    try {
+      const ciIso = localInputToIso(checkinLocal)
+      const coIso = localInputToIso(checkoutLocal)
+
+      if (ciIso && coIso && new Date(ciIso) > new Date(coIso)) {
+        throw new Error('퇴근 시간이 출근 시간보다 빠릅니다.')
+      }
+
+      const { data: session } = await supabaseClient.auth.getSession()
+      const token = session.session?.access_token
+      if (!token) throw new Error('세션이 없습니다. 다시 로그인 해주세요.')
+
+      const res = await fetch(`/api/admin/staff/${staff.id}/set-attendance`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          last_checkin_at: ciIso,
+          last_checkout_at: coIso,
+        }),
+      })
+
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(json?.error || '출퇴근 저장 실패')
+
+      const updated = json.staff as { last_checkin_at: string | null; last_checkout_at: string | null }
+
+      const nextStaff: Staff = {
+        ...staff,
+        last_checkin_at: updated.last_checkin_at ?? ciIso,
+        last_checkout_at: updated.last_checkout_at ?? coIso,
+      }
+
+      setStaff(nextStaff)
+      setAttOpen(false)
+      setMessage('출퇴근 시간이 저장되었습니다.')
+
+      const nextBase = nextStaff.last_checkin_at ? toKstDateString(nextStaff.last_checkin_at) : getKstDateString()
+      await fetchWorkLogs(nextStaff.id, nextBase)
+    } catch (e: any) {
+      setAttError(e?.message ?? '출퇴근 저장 오류')
+    } finally {
+      setAttSaving(false)
+    }
+  }
+
+  // 1-13) 저장(근무 + 정산)
   const onSave = async () => {
     setError(null)
     setMessage(null)
 
     if (!staff) return
 
-    // 1-14-1) validation
-    if (!selectedStoreId) return setError('1-14-1) 가게를 선택하세요.')
-    if (!workTime) return setError('1-14-1) 시작 시각을 선택하세요.')
-    if (minutes <= 0) return setError('1-14-1) 근무 시간을 추가하세요.')
-    if (amount <= 0) return setError('1-14-1) 정산 금액이 0원입니다.')
+    if (!selectedStoreId) return setError('1-13-1) 가게를 선택하세요.')
+    if (!workTime) return setError('1-13-1) 시작 시각을 선택하세요.')
+    if (minutes <= 0) return setError('1-13-1) 근무 시간을 추가하세요.')
+    if (amount <= 0) return setError('1-13-1) 정산 금액이 0원입니다.')
 
     setSaving(true)
     try {
-      // 1-14-2) 날짜는 입력에서 제거됨 → baseDate + time 으로 work_at 계산
-      //          자정 넘어가는 경우(다음날) 자동 보정
       const workAtIso = computeWorkAtIso({
         baseDate,
         timeHm: workTime,
@@ -229,7 +276,6 @@ export default function AdminStaffDetailPage() {
 
       const nowIso = new Date().toISOString()
 
-      // 1-14-3) staff_work_logs insert (id 리턴 받아서, payment memo에 태그로 남김 → 삭제 연결)
       const { data: wData, error: wErr } = await supabaseClient
         .from('staff_work_logs')
         .insert({
@@ -243,70 +289,62 @@ export default function AdminStaffDetailPage() {
         .select('id')
         .single()
 
-      if (wErr) throw new Error(`1-14-3) 근무 저장 실패: ${wErr.message}`)
+      if (wErr) throw new Error(`1-13-3) 근무 저장 실패: ${wErr.message}`)
       const workLogId = wData?.id as number | undefined
-      if (!workLogId) throw new Error('1-14-3) workLogId missing')
+      if (!workLogId) throw new Error('1-13-3) workLogId missing')
 
-      // 1-14-4) staff_payment_logs insert (memo에 연결 태그를 항상 포함)
-      // 3-1-1) staff_payment_logs insert (work_log_id로 1:1 연결)
-const { error: pErr } = await supabaseClient.from('staff_payment_logs').insert({
-  staff_id: staff.id,
-  work_log_id: workLogId, // 3-1-1-1) 핵심: work_log_id 저장
-  amount,
-  method: 'cash',
-  paid_at: nowIso,
-  memo: memo.trim() ? memo.trim() : null,
-})
-if (pErr) throw new Error(`1-14-4) 정산 저장 실패: ${pErr.message}`)
+      const { error: pErr } = await supabaseClient.from('staff_payment_logs').insert({
+        staff_id: staff.id,
+        work_log_id: workLogId,
+        amount,
+        method: 'cash',
+        paid_at: nowIso,
+        memo: memo.trim() ? memo.trim() : null,
+      })
+      if (pErr) throw new Error(`1-13-4) 정산 저장 실패: ${pErr.message}`)
 
-      // 1-14-5) 성공 처리
       setMessage('근무 + 정산 내역이 저장되었습니다.')
       resetForm()
-
-      // 1-14-6) 근무 내역 재조회(기준일 유지)
       await fetchWorkLogs(staff.id, baseDate)
     } catch (e: any) {
-      setError(e?.message ?? '1-14) 저장 오류')
+      setError(e?.message ?? '1-13) 저장 오류')
     } finally {
       setSaving(false)
     }
   }
 
-  // 1-15) 근무 내역 삭제
-const onDeleteWorkLog = async (workLogId: number) => {
-  if (!staff) return
-  setError(null)
-  setMessage(null)
+  // 1-14) 근무 내역 삭제
+  const onDeleteWorkLog = async (workLogId: number) => {
+    if (!staff) return
+    setError(null)
+    setMessage(null)
 
-  const ok = window.confirm('이 근무 내역을 삭제할까요?')
-  if (!ok) return
+    const ok = window.confirm('이 근무 내역을 삭제할까요?')
+    if (!ok) return
 
-  setDeletingId(workLogId)
-  try {
-    // 1-15-1) delete 결과를 select로 받아서 "실제로 삭제됐는지" 확인
-    const { data: deletedRows, error: dErr } = await supabaseClient
-      .from('staff_work_logs')
-      .delete()
-      .eq('id', workLogId)
-      .select('id') // 1-15-1-1) 삭제된 행 반환(0개면 실제 삭제 안된 것)
+    setDeletingId(workLogId)
+    try {
+      const { data: deletedRows, error: dErr } = await supabaseClient
+        .from('staff_work_logs')
+        .delete()
+        .eq('id', workLogId)
+        .select('id')
 
-    if (dErr) throw new Error(`1-15-1) 삭제 실패: ${dErr.message}`)
+      if (dErr) throw new Error(`1-14-1) 삭제 실패: ${dErr.message}`)
+      if (!deletedRows || deletedRows.length === 0) {
+        throw new Error('1-14-2) 삭제 권한이 없거나, 이미 삭제된 항목입니다(RLS 가능성).')
+      }
 
-    // 1-15-2) RLS/권한 문제면 0개가 돌아올 수 있음 → 이때는 실패로 처리
-    if (!deletedRows || deletedRows.length === 0) {
-      throw new Error('1-15-2) 삭제 권한이 없거나, 이미 삭제된 항목입니다(RLS 가능성).')
+      setMessage('삭제되었습니다.')
+      await fetchWorkLogs(staff.id, baseDate)
+    } catch (e: any) {
+      setError(e?.message ?? '1-14) 삭제 오류')
+    } finally {
+      setDeletingId(null)
     }
-
-    // 1-15-3) 성공
-    setMessage('삭제되었습니다.')
-    await fetchWorkLogs(staff.id, baseDate)
-  } catch (e: any) {
-    setError(e?.message ?? '1-15) 삭제 오류')
-  } finally {
-    setDeletingId(null)
   }
-}
-  // 1-16) ★ 계좌 저장
+
+  // 1-15) ★ 계좌 저장
   const onSaveBank = async () => {
     if (!staff) return
     setError(null)
@@ -323,7 +361,7 @@ const onDeleteWorkLog = async (workLogId: number) => {
         })
         .eq('id', staff.id)
 
-      if (error) throw new Error(`1-16) 계좌 저장 실패: ${error.message}`)
+      if (error) throw new Error(`1-15) 계좌 저장 실패: ${error.message}`)
 
       setStaff({
         ...staff,
@@ -335,13 +373,13 @@ const onDeleteWorkLog = async (workLogId: number) => {
       setMessage('저장되었습니다.')
       setBankOpen(false)
     } catch (e: any) {
-      setError(e?.message ?? '1-16) 오류')
+      setError(e?.message ?? '1-15) 오류')
     } finally {
       setBankSaving(false)
     }
   }
 
-  // 1-17) 로그아웃
+  // 1-16) 로그아웃
   const onLogout = async () => {
     await supabaseClient.auth.signOut()
     router.replace('/login')
@@ -352,7 +390,15 @@ const onDeleteWorkLog = async (workLogId: number) => {
   if (!staff) {
     return (
       <div className="space-y-4">
-        <PageHeader title="직원 상세" backHref="/admin/staff" right={<ProButton variant="ghost" onClick={onLogout}>로그아웃</ProButton>} />
+        <PageHeader
+          title="직원 상세"
+          backHref="/admin/staff"
+          right={
+            <ProButton variant="ghost" onClick={onLogout}>
+              로그아웃
+            </ProButton>
+          }
+        />
         <GlassCard className="p-6">
           <div className="text-white/80">직원 정보를 불러오지 못했습니다.</div>
           {error && <div className="mt-3 text-sm text-red-200">{error}</div>}
@@ -363,24 +409,25 @@ const onDeleteWorkLog = async (workLogId: number) => {
 
   return (
     <div className="space-y-6">
-      {/* 1-18) 헤더 */}
+      {/* 헤더: ✅ 근무 버튼 제거, ✅ 계좌는 별 아이콘만 */}
       <PageHeader
         title={staff.nickname}
         subtitle={staff.login_id}
         backHref="/admin/staff"
         right={
           <div className="flex items-center gap-2">
-            {/* 1-18-1) ★ 계좌 버튼 */}
             <button
               onClick={() => setBankOpen(true)}
               className={cn(
-                'inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm',
-                'border border-white/12 bg-white/5 text-white/85 hover:bg-white/10 transition'
+                'inline-flex items-center justify-center',
+                'h-10 w-10 rounded-xl border border-white/12 bg-white/5',
+                'text-white/85 hover:bg-white/10 transition'
               )}
               type="button"
+              aria-label="계좌"
+              title="계좌"
             >
-              <Star className="h-4 w-4" />
-              계좌
+              <Star className="h-5 w-5" />
             </button>
 
             <ProButton variant="ghost" onClick={onLogout}>
@@ -390,17 +437,9 @@ const onDeleteWorkLog = async (workLogId: number) => {
         }
       />
 
-      {/* 1-19) 섹션 1: 근무 상태 */}
-      <GlassCard className="p-6">
-        <div className="text-white font-semibold tracking-tight">근무 상태</div>
-        <div className="mt-2">
-          <div className="text-sm text-white/55">현재 상태</div>
-          <div className="mt-1 text-lg text-white">{workingStatus.label}</div>
-          {workingStatus.detail && <div className="mt-1 text-sm text-white/55">{workingStatus.detail}</div>}
-        </div>
-      </GlassCard>
+      {/* 근무 상태 카드/근무 버튼 등: 전부 제거됨 */}
 
-      {/* 1-20) 섹션 2: 근무/정산 입력 */}
+      {/* 섹션: 근무/정산 입력 */}
       <GlassCard className="p-6">
         <div className="flex items-start justify-between gap-3">
           <div>
@@ -421,7 +460,6 @@ const onDeleteWorkLog = async (workLogId: number) => {
           </button>
         </div>
 
-        {/* 1-20-1) 가게 선택(검색+선택 합침, 스크롤 드롭다운) */}
         <div className="mt-5">
           <label className="text-sm font-medium text-white/80">가게 선택</label>
 
@@ -432,18 +470,16 @@ const onDeleteWorkLog = async (workLogId: number) => {
               onChange={(e) => {
                 setStoreQuery(e.target.value)
                 setStoreDropdownOpen(true)
-                setSelectedStoreId('') // 1-20-1-1) 다시 입력하면 선택 초기화
+                setSelectedStoreId('')
               }}
               onFocus={() => setStoreDropdownOpen(true)}
               onBlur={() => {
-                // 1-20-1-2) 클릭 선택을 위해 blur 지연
                 window.setTimeout(() => setStoreDropdownOpen(false), 120)
               }}
               placeholder="예: ㄱ (초성) / 강남"
               autoComplete="off"
             />
 
-            {/* 1-20-1-3) 드롭다운 */}
             {storeDropdownOpen && filteredStores.length > 0 && (
               <div
                 className={cn(
@@ -455,7 +491,7 @@ const onDeleteWorkLog = async (workLogId: number) => {
                   {filteredStores.map((s) => (
                     <button
                       key={s.id}
-                      onMouseDown={(e) => e.preventDefault()} // 1-20-1-4) blur로 닫히기 전에 선택
+                      onMouseDown={(e) => e.preventDefault()}
                       onClick={() => onPickStore(s)}
                       className="w-full text-left px-4 py-3 hover:bg-white/10 transition"
                       type="button"
@@ -470,7 +506,6 @@ const onDeleteWorkLog = async (workLogId: number) => {
           </div>
         </div>
 
-        {/* 1-20-2) 시간만 */}
         <div className="mt-5">
           <label className="text-sm font-medium text-white/80">시작 시각</label>
           <input
@@ -479,12 +514,9 @@ const onDeleteWorkLog = async (workLogId: number) => {
             value={workTime}
             onChange={(e) => setWorkTime(e.target.value)}
           />
-          <div className="mt-2 text-xs text-white/40">
-            기준일: {baseDate} (자정 넘어가면 자동으로 다음날로 계산)
-          </div>
+          <div className="mt-2 text-xs text-white/40">기준일: {baseDate} (자정 넘어가면 자동으로 다음날로 계산)</div>
         </div>
 
-        {/* 1-20-3) 시간/금액 표시 */}
         <div className="mt-5 rounded-2xl border border-white/10 bg-white/5 p-4">
           <div className="text-sm text-white/55">현재</div>
           <div className="mt-1 text-white font-semibold">
@@ -492,7 +524,6 @@ const onDeleteWorkLog = async (workLogId: number) => {
           </div>
         </div>
 
-        {/* 1-20-4) 시간 추가 버튼 */}
         <div className="mt-4 grid gap-2 sm:grid-cols-4">
           <TimeButton label="+30분" onClick={() => setMinutes((m) => m + 30)} />
           <TimeButton label="+1시간" onClick={() => setMinutes((m) => m + 60)} />
@@ -500,13 +531,11 @@ const onDeleteWorkLog = async (workLogId: number) => {
           <TimeButton label="+2시간" onClick={() => setMinutes((m) => m + 120)} />
         </div>
 
-        {/* 1-20-5) 옵션(중복 제거: 아이콘 없이 텍스트만 하나씩) */}
         <div className="mt-4 flex items-center gap-2">
           <OptionTextButton active={optionHeart} onClick={() => setOptionHeart((v) => !v)} text="♡" />
           <OptionTextButton active={optionAt} onClick={() => setOptionAt((v) => !v)} text="@" />
         </div>
 
-        {/* 1-20-6) 메모 */}
         <div className="mt-4">
           <label className="text-sm font-medium text-white/80">정산 메모(선택)</label>
           <textarea
@@ -517,7 +546,6 @@ const onDeleteWorkLog = async (workLogId: number) => {
           />
         </div>
 
-        {/* 1-20-7) 메시지/에러 */}
         {message && (
           <div className="mt-4 rounded-xl border border-emerald-300/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100">
             {message}
@@ -529,7 +557,6 @@ const onDeleteWorkLog = async (workLogId: number) => {
           </div>
         )}
 
-        {/* 1-20-8) 저장 버튼 */}
         <div className="mt-4">
           <ProButton onClick={onSave} disabled={saving} className="w-full">
             <Save className="mr-2 h-4 w-4" />
@@ -538,7 +565,7 @@ const onDeleteWorkLog = async (workLogId: number) => {
         </div>
       </GlassCard>
 
-      {/* 1-21) 섹션 3: 근무 내역 리스트(삭제 + 금액 표시 추가) */}
+      {/* 섹션: 근무 내역 */}
       <GlassCard className="p-6">
         <div className="flex items-end justify-between gap-3">
           <div>
@@ -549,14 +576,12 @@ const onDeleteWorkLog = async (workLogId: number) => {
         </div>
 
         <div className="mt-4 divide-y divide-white/10">
-          {workLogs.length === 0 && (
-            <div className="py-6 text-sm text-white/60">해당 날짜의 근무 내역이 없습니다.</div>
-          )}
+          {workLogs.length === 0 && <div className="py-6 text-sm text-white/60">해당 날짜의 근무 내역이 없습니다.</div>}
 
           {workLogs.map((w) => {
             const time = toKstTime(new Date(w.work_at))
             const storeName = w.stores?.name ?? '가게 미지정'
-            const rowAmount = (w.minutes || 0) * 500 // 1-21-1) 금액 표시(분*500)
+            const rowAmount = (w.minutes || 0) * 500
 
             return (
               <div key={w.id} className="py-4 flex items-center justify-between gap-3">
@@ -568,21 +593,15 @@ const onDeleteWorkLog = async (workLogId: number) => {
                 </div>
 
                 <div className="shrink-0 flex items-center gap-2">
-                  {/* 1-21-2) 옵션 표기(그대로 유지) */}
                   <div className="flex items-center gap-2 text-white/70">
                     {w.option_heart && (
-                      <span className="rounded-full border border-white/12 bg-white/5 px-2 py-1 text-xs">
-                        ♡
-                      </span>
+                      <span className="rounded-full border border-white/12 bg-white/5 px-2 py-1 text-xs">♡</span>
                     )}
                     {w.option_at && (
-                      <span className="rounded-full border border-white/12 bg-white/5 px-2 py-1 text-xs">
-                        @
-                      </span>
+                      <span className="rounded-full border border-white/12 bg-white/5 px-2 py-1 text-xs">@</span>
                     )}
                   </div>
 
-                  {/* 1-21-3) 삭제 버튼 */}
                   <button
                     onClick={() => onDeleteWorkLog(w.id)}
                     disabled={deletingId === w.id}
@@ -603,7 +622,77 @@ const onDeleteWorkLog = async (workLogId: number) => {
         </div>
       </GlassCard>
 
-      {/* 1-22) ★ 계좌 모달 */}
+      {/* ✅ 출퇴근 설정 모달: 현재 트리거 없음(원하면 나중에 다시 버튼/아이콘 연결) */}
+      {attOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-6">
+          <button className="absolute inset-0 bg-black/60" onClick={() => setAttOpen(false)} aria-label="닫기" />
+          <div className="relative w-full max-w-md">
+            <GlassCard className="p-6">
+              <div>
+                <div className="text-white text-lg font-semibold">출퇴근 설정</div>
+                <div className="mt-1 text-sm text-white/55">직원이 못찍었을 때 관리자 수동 수정</div>
+              </div>
+
+              <div className="mt-5 space-y-4">
+                <div>
+                  <div className="flex items-center justify-between">
+                    <label className="text-sm font-medium text-white/80">출근 일시</label>
+                    <button
+                      type="button"
+                      onClick={() => setCheckinLocal('')}
+                      className="text-xs text-white/45 hover:text-white/80 transition"
+                    >
+                      비우기
+                    </button>
+                  </div>
+                  <input
+                    type="datetime-local"
+                    className="mt-2 w-full rounded-xl border border-white/12 bg-black/20 px-3 py-2.5 text-white outline-none focus:border-white/25"
+                    value={checkinLocal}
+                    onChange={(e) => setCheckinLocal(e.target.value)}
+                  />
+                </div>
+
+                <div>
+                  <div className="flex items-center justify-between">
+                    <label className="text-sm font-medium text-white/80">퇴근 일시</label>
+                    <button
+                      type="button"
+                      onClick={() => setCheckoutLocal('')}
+                      className="text-xs text-white/45 hover:text-white/80 transition"
+                    >
+                      비우기
+                    </button>
+                  </div>
+                  <input
+                    type="datetime-local"
+                    className="mt-2 w-full rounded-xl border border-white/12 bg-black/20 px-3 py-2.5 text-white outline-none focus:border-white/25"
+                    value={checkoutLocal}
+                    onChange={(e) => setCheckoutLocal(e.target.value)}
+                  />
+                </div>
+
+                {attError && (
+                  <div className="rounded-xl border border-red-400/30 bg-red-500/10 px-4 py-3 text-sm text-red-100">
+                    {attError}
+                  </div>
+                )}
+
+                <div className="pt-2 flex gap-2">
+                  <ProButton variant="ghost" className="flex-1" type="button" onClick={() => setAttOpen(false)} disabled={attSaving}>
+                    취소
+                  </ProButton>
+                  <ProButton className="flex-1" type="button" onClick={onSaveAttendance} disabled={attSaving}>
+                    {attSaving ? '저장 중...' : '저장하기'}
+                  </ProButton>
+                </div>
+              </div>
+            </GlassCard>
+          </div>
+        </div>
+      )}
+
+      {/* ★ 계좌 모달 */}
       {bankOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-6">
           <button className="absolute inset-0 bg-black/60" onClick={() => setBankOpen(false)} aria-label="닫기" />
@@ -672,10 +761,7 @@ function TimeButton({ label, onClick }: { label: string; onClick: () => void }) 
   return (
     <button
       onClick={onClick}
-      className={cn(
-        'rounded-xl px-3 py-2.5 text-sm transition border',
-        'bg-white/5 text-white/85 border-white/12 hover:bg-white/10'
-      )}
+      className={cn('rounded-xl px-3 py-2.5 text-sm transition border', 'bg-white/5 text-white/85 border-white/12 hover:bg-white/10')}
       type="button"
     >
       {label}
@@ -683,23 +769,13 @@ function TimeButton({ label, onClick }: { label: string; onClick: () => void }) 
   )
 }
 
-function OptionTextButton({
-  active,
-  onClick,
-  text,
-}: {
-  active: boolean
-  onClick: () => void
-  text: string
-}) {
+function OptionTextButton({ active, onClick, text }: { active: boolean; onClick: () => void; text: string }) {
   return (
     <button
       onClick={onClick}
       className={cn(
         'inline-flex items-center justify-center rounded-xl px-4 py-2 text-sm transition border',
-        active
-          ? 'bg-white text-zinc-900 border-white/0'
-          : 'bg-white/5 text-white/85 border-white/12 hover:bg-white/10'
+        active ? 'bg-white text-zinc-900 border-white/0' : 'bg-white/5 text-white/85 border-white/12 hover:bg-white/10'
       )}
       type="button"
       aria-label={text}
@@ -713,33 +789,16 @@ function OptionTextButton({
    3) 날짜/시간 유틸 (KST + 자정 보정)
 ------------------------- */
 
-function computeWorkAtIso(args: {
-  baseDate: string // YYYY-MM-DD
-  timeHm: string // HH:MM
-  staffCheckinIso: string | null
-  lastLogIso: string | null
-}) {
-  // 3-1) 기본: baseDate + time
+function computeWorkAtIso(args: { baseDate: string; timeHm: string; staffCheckinIso: string | null; lastLogIso: string | null }) {
   const baseIso = new Date(`${args.baseDate}T${args.timeHm}:00+09:00`).toISOString()
 
-  // 3-2) 자정 넘어감 판단 규칙(현실적인 자동 보정)
-  //      - 체크인 시간이 있고, 입력 시간이 체크인 시간보다 "이전"이면 다음날로 간주
-  //      - 또는 마지막 근무기록 시간이 있고, 입력 시간이 마지막 기록 시간보다 "이전"이면 다음날로 간주
   const inputMin = hhmmToMinutes(args.timeHm)
+  const checkinMin = args.staffCheckinIso ? hhmmToMinutes(toKstHHMM(args.staffCheckinIso)) : null
+  const lastLogMin = args.lastLogIso ? hhmmToMinutes(toKstHHMM(args.lastLogIso)) : null
 
-  const checkinMin =
-    args.staffCheckinIso ? hhmmToMinutes(toKstHHMM(args.staffCheckinIso)) : null
-
-  const lastLogMin =
-    args.lastLogIso ? hhmmToMinutes(toKstHHMM(args.lastLogIso)) : null
-
-  const shouldNextDay =
-    (checkinMin != null && inputMin < checkinMin) ||
-    (lastLogMin != null && inputMin < lastLogMin)
-
+  const shouldNextDay = (checkinMin != null && inputMin < checkinMin) || (lastLogMin != null && inputMin < lastLogMin)
   if (!shouldNextDay) return baseIso
 
-  // 3-3) 다음날로 +1 day
   const nextDay = new Date(`${args.baseDate}T${args.timeHm}:00+09:00`)
   nextDay.setDate(nextDay.getDate() + 1)
   return nextDay.toISOString()
@@ -772,16 +831,20 @@ function getTimeHHMM() {
   return `${hh}:${mm}`
 }
 
+function toKstTime(d: Date) {
+  return d.toLocaleTimeString('ko-KR', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  })
+}
+
 function toKstDateString(iso: string) {
   const d = new Date(iso)
   const y = d.getFullYear()
   const m = String(d.getMonth() + 1).padStart(2, '0')
   const day = String(d.getDate()).padStart(2, '0')
   return `${y}-${m}-${day}`
-}
-
-function toKstTime(d: Date) {
-  return d.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false })
 }
 
 function formatCurrency(n: number) {
@@ -803,15 +866,34 @@ function getKstDayRangeIso(dateYmd: string) {
   return { startIso, endIso: end.toISOString() }
 }
 
+/* ✅ datetime-local 변환 */
+function isoToLocalInput(iso: string | null) {
+  if (!iso) return ''
+  const d = new Date(iso)
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  const hh = String(d.getHours()).padStart(2, '0')
+  const mm = String(d.getMinutes()).padStart(2, '0')
+  return `${y}-${m}-${day}T${hh}:${mm}`
+}
+
+function localInputToIso(v: string) {
+  const s = (v ?? '').trim()
+  if (!s) return null
+  const d = new Date(s)
+  if (!Number.isFinite(d.getTime())) return null
+  return d.toISOString()
+}
+
 /* -------------------------
-   4) 초성 검색 유틸 (ㄱ 입력 → 가/강/골... 매칭)
+   4) 초성 검색 유틸
 ------------------------- */
-// 2-4) 초성 1글자 여부
+
 function isSingleChosung(q: string) {
   return q.length === 1 && CHOSUNG.includes(q)
 }
 
-// 2-5) "가게명에서 첫 한글 글자"의 초성만 뽑기
 function getLeadingHangulChosung(name: string) {
   for (const ch of name) {
     const c = getChosung(ch)
@@ -820,23 +902,10 @@ function getLeadingHangulChosung(name: string) {
   return null
 }
 
-const CHOSUNG = [
-  'ㄱ','ㄲ','ㄴ','ㄷ','ㄸ','ㄹ','ㅁ','ㅂ','ㅃ','ㅅ','ㅆ','ㅇ','ㅈ','ㅉ','ㅊ','ㅋ','ㅌ','ㅍ','ㅎ',
-]
-
-function toChosungString(str: string) {
-  // 4-1) 문자열을 초성 문자열로 변환
-  let out = ''
-  for (const ch of str) {
-    out += getChosung(ch) ?? ch
-  }
-  return out
-}
+const CHOSUNG = ['ㄱ','ㄲ','ㄴ','ㄷ','ㄸ','ㄹ','ㅁ','ㅂ','ㅃ','ㅅ','ㅆ','ㅇ','ㅈ','ㅉ','ㅊ','ㅋ','ㅌ','ㅍ','ㅎ']
 
 function getChosung(ch: string) {
-  // 4-2) 한글 음절이면 초성 반환
   const code = ch.charCodeAt(0)
-  // Hangul Syllables range: AC00–D7A3
   if (code < 0xac00 || code > 0xd7a3) return null
   const index = Math.floor((code - 0xac00) / 588)
   return CHOSUNG[index] ?? null
