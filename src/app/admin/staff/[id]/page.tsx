@@ -40,16 +40,19 @@ export default function AdminStaffDetailPage() {
   const params = useParams<{ id: string }>()
   const staffId = params.id
 
-  // 1-2) 데이터 상태
-  const [loading, setLoading] = useState(true)
-  const [staff, setStaff] = useState<Staff | null>(null)
+  // ✅ 1-2) 로딩 분리 (핵심)
+  const [staffLoading, setStaffLoading] = useState(true)
+  const [storesLoading, setStoresLoading] = useState(true)
+  const [logsLoading, setLogsLoading] = useState(true)
 
+  // 1-3) 데이터 상태
+  const [staff, setStaff] = useState<Staff | null>(null)
   const [stores, setStores] = useState<StoreRow[]>([])
   const [workLogs, setWorkLogs] = useState<WorkLogRow[]>([])
   const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
-  // 1-3) 입력 폼 상태
+  // 1-4) 입력 폼 상태
   const [storeQuery, setStoreQuery] = useState('')
   const [selectedStoreId, setSelectedStoreId] = useState<number | ''>('')
   const [storeDropdownOpen, setStoreDropdownOpen] = useState(false)
@@ -63,7 +66,7 @@ export default function AdminStaffDetailPage() {
   const [saving, setSaving] = useState(false)
   const [deletingId, setDeletingId] = useState<number | null>(null)
 
-  // 1-4) ★ 계좌 모달 상태
+  // 1-5) ★ 계좌 모달 상태
   const [bankOpen, setBankOpen] = useState(false)
   const [bankName, setBankName] = useState('')
   const [bankAccount, setBankAccount] = useState('')
@@ -77,16 +80,16 @@ export default function AdminStaffDetailPage() {
   const [attSaving, setAttSaving] = useState(false)
   const [attError, setAttError] = useState<string | null>(null)
 
-  // 1-5) 금액 계산(30분=15000 => 1분=500)
+  // 1-6) 금액 계산(30분=15000 => 1분=500)
   const amount = useMemo(() => minutes * 500, [minutes])
 
-  // 1-6) 기준일: 출근일 있으면 그 날짜, 없으면 오늘(KST)
+  // 1-7) 기준일: 출근일 있으면 그 날짜, 없으면 오늘(KST)
   const baseDate = useMemo(() => {
     if (!staff?.last_checkin_at) return getKstDateString()
     return toKstDateString(staff.last_checkin_at)
   }, [staff?.last_checkin_at])
 
-  // 1-7) 가게 필터(초성 검색 포함)
+  // 1-8) 가게 필터(초성 검색 포함)
   const filteredStores = useMemo(() => {
     const q = storeQuery.trim()
     const active = stores.filter((s) => s.is_active)
@@ -109,62 +112,53 @@ export default function AdminStaffDetailPage() {
       })
   }, [stores, storeQuery])
 
-  // 1-8) 근무 내역 총합(기준일)
+  // 1-9) 근무 내역 총합(기준일)
   const totalMinutes = useMemo(() => workLogs.reduce((sum, w) => sum + (w.minutes || 0), 0), [workLogs])
 
-  // 1-9) 초기 로드
-  useEffect(() => {
-    ;(async () => {
-      setLoading(true)
-      setError(null)
-      setMessage(null)
+  // ✅ 1-10) stores 로드: 캐시(10분) + 네트워크
+  const loadStoresFast = async (): Promise<StoreRow[]> => {
+    const key = 'pc_stores_v1'
+    const ttlMs = 10 * 60 * 1000
 
-      try {
-        // 1-9-1) 토큰 확보
-        const { data: session } = await supabaseClient.auth.getSession()
-        const token = session.session?.access_token
-        if (!token) throw new Error('1-9-1) 세션이 없습니다. 다시 로그인 해주세요.')
-
-        // 1-9-2) staff(API: service role)
-        const res = await fetch(`/api/admin/staff/${staffId}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        })
-        const json = await res.json().catch(() => ({}))
-        if (!res.ok) throw new Error(json?.error || '1-9-2) staff 조회 실패')
-
-        const staffData = json.staff as Staff
-        setStaff(staffData)
-
-        // 1-9-3) ★ 계좌 모달 기본값
-        setBankName(staffData.bank_name ?? '')
-        setBankAccount(staffData.bank_account ?? '')
-        setBankHolder(staffData.bank_holder ?? '')
-
-        // 1-9-4) stores 로드
-        const { data: storesData, error: storesErr } = await supabaseClient
-          .from('stores')
-          .select('id, name, is_active')
-          .order('name', { ascending: true })
-
-        if (storesErr) throw new Error(`1-9-4) stores 로드 실패: ${storesErr.message}`)
-        setStores((storesData as StoreRow[]) ?? [])
-
-        // 1-9-5) 근무 내역 로드(기준일)
-        const targetDate = staffData.last_checkin_at ? toKstDateString(staffData.last_checkin_at) : getKstDateString()
-        await fetchWorkLogs(staffData.id, targetDate)
-      } catch (e: any) {
-        setError(e?.message ?? '1-9) 오류')
-      } finally {
-        setLoading(false)
+    // 1-10-1) 캐시 우선
+    try {
+      const cached = sessionStorage.getItem(key)
+      if (cached) {
+        const parsed = JSON.parse(cached)
+        if (parsed?.ts && Array.isArray(parsed?.rows) && Date.now() - parsed.ts < ttlMs) {
+          return parsed.rows as StoreRow[]
+        }
       }
-    })()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [staffId])
+    } catch {
+      // ignore
+    }
 
-  // 1-10) 근무 내역 로드 함수(날짜 범위 필터)
+    // 1-10-2) 캐시 없으면 네트워크
+    const t0 = performance.now()
+    const { data, error } = await supabaseClient
+      .from('stores')
+      .select('id, name, is_active')
+      .order('name', { ascending: true })
+
+    console.log('stores(ms)=', performance.now() - t0, error)
+
+    if (error) throw new Error(`stores 로드 실패: ${error.message}`)
+    const rows = (data ?? []) as StoreRow[]
+
+    try {
+      sessionStorage.setItem(key, JSON.stringify({ ts: Date.now(), rows }))
+    } catch {
+      // ignore
+    }
+
+    return rows
+  }
+
+  // ✅ 1-11) 근무 내역 로드 함수(날짜 범위 필터)
   const fetchWorkLogs = async (sid: string, ymd: string) => {
     const { startIso, endIso } = getKstDayRangeIso(ymd)
 
+    const t0 = performance.now()
     const { data, error } = await supabaseClient
       .from('staff_work_logs')
       .select('id, work_at, minutes, option_heart, option_at, stores(name)')
@@ -173,11 +167,78 @@ export default function AdminStaffDetailPage() {
       .lt('work_at', endIso)
       .order('work_at', { ascending: true })
 
-    if (error) throw new Error(`1-10) work_logs 로드 실패: ${error.message}`)
+    console.log('worklogs(ms)=', performance.now() - t0, error)
+
+    if (error) throw new Error(`work_logs 로드 실패: ${error.message}`)
     setWorkLogs((data as any) ?? [])
   }
 
-  // 1-11) 입력 초기화
+  // ✅ 1-12) 초기 로드: staff 먼저 → stores/logs 병렬
+  useEffect(() => {
+    let alive = true
+
+    ;(async () => {
+      setStaffLoading(true)
+      setStoresLoading(true)
+      setLogsLoading(true)
+      setError(null)
+      setMessage(null)
+
+      try {
+        // 1-12-1) 토큰 확보
+        const { data: session } = await supabaseClient.auth.getSession()
+        const token = session.session?.access_token
+        if (!token) throw new Error('세션이 없습니다. 다시 로그인 해주세요.')
+
+        // 1-12-2) staff(API)
+        const tApi = performance.now()
+        const res = await fetch(`/api/admin/staff/${staffId}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        })
+        const json = await res.json().catch(() => ({}))
+        console.log('staff_api(ms)=', performance.now() - tApi)
+
+        if (!res.ok) throw new Error(json?.error || 'staff 조회 실패')
+
+        const staffData = json.staff as Staff
+        if (!alive) return
+
+        setStaff(staffData)
+        setBankName(staffData.bank_name ?? '')
+        setBankAccount(staffData.bank_account ?? '')
+        setBankHolder(staffData.bank_holder ?? '')
+        setStaffLoading(false) // ✅ 화면은 여기서 바로 뜸
+
+        // 1-12-3) stores + worklogs 병렬
+        const targetDate = staffData.last_checkin_at ? toKstDateString(staffData.last_checkin_at) : getKstDateString()
+
+        loadStoresFast()
+          .then((rows) => {
+            if (!alive) return
+            setStores(rows)
+          })
+          .catch((e: any) => alive && setError(e?.message ?? 'stores 로드 오류'))
+          .finally(() => alive && setStoresLoading(false))
+
+        fetchWorkLogs(staffData.id, targetDate)
+          .catch((e: any) => alive && setError(e?.message ?? 'worklogs 로드 오류'))
+          .finally(() => alive && setLogsLoading(false))
+      } catch (e: any) {
+        if (!alive) return
+        setError(e?.message ?? '초기 로드 오류')
+        setStaffLoading(false)
+        setStoresLoading(false)
+        setLogsLoading(false)
+      }
+    })()
+
+    return () => {
+      alive = false
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [staffId])
+
+  // 1-13) 입력 초기화
   const resetForm = () => {
     setMinutes(0)
     setOptionHeart(false)
@@ -185,7 +246,7 @@ export default function AdminStaffDetailPage() {
     setMemo('')
   }
 
-  // 1-12) 가게 선택 처리
+  // 1-14) 가게 선택 처리
   const onPickStore = (s: StoreRow) => {
     setSelectedStoreId(s.id)
     setStoreQuery(s.name)
@@ -244,26 +305,29 @@ export default function AdminStaffDetailPage() {
       setAttOpen(false)
       setMessage('출퇴근 시간이 저장되었습니다.')
 
+      // ✅ 저장 후 근무내역 재조회 (체크인 날짜 기준)
+      setLogsLoading(true)
       const nextBase = nextStaff.last_checkin_at ? toKstDateString(nextStaff.last_checkin_at) : getKstDateString()
       await fetchWorkLogs(nextStaff.id, nextBase)
     } catch (e: any) {
       setAttError(e?.message ?? '출퇴근 저장 오류')
     } finally {
+      setLogsLoading(false)
       setAttSaving(false)
     }
   }
 
-  // 1-13) 저장(근무 + 정산)
+  // 1-15) 저장(근무 + 정산)
   const onSave = async () => {
     setError(null)
     setMessage(null)
 
     if (!staff) return
 
-    if (!selectedStoreId) return setError('1-13-1) 가게를 선택하세요.')
-    if (!workTime) return setError('1-13-1) 시작 시각을 선택하세요.')
-    if (minutes <= 0) return setError('1-13-1) 근무 시간을 추가하세요.')
-    if (amount <= 0) return setError('1-13-1) 정산 금액이 0원입니다.')
+    if (!selectedStoreId) return setError('가게를 선택하세요.')
+    if (!workTime) return setError('시작 시각을 선택하세요.')
+    if (minutes <= 0) return setError('근무 시간을 추가하세요.')
+    if (amount <= 0) return setError('정산 금액이 0원입니다.')
 
     setSaving(true)
     try {
@@ -289,9 +353,9 @@ export default function AdminStaffDetailPage() {
         .select('id')
         .single()
 
-      if (wErr) throw new Error(`1-13-3) 근무 저장 실패: ${wErr.message}`)
+      if (wErr) throw new Error(`근무 저장 실패: ${wErr.message}`)
       const workLogId = wData?.id as number | undefined
-      if (!workLogId) throw new Error('1-13-3) workLogId missing')
+      if (!workLogId) throw new Error('workLogId missing')
 
       const { error: pErr } = await supabaseClient.from('staff_payment_logs').insert({
         staff_id: staff.id,
@@ -301,19 +365,23 @@ export default function AdminStaffDetailPage() {
         paid_at: nowIso,
         memo: memo.trim() ? memo.trim() : null,
       })
-      if (pErr) throw new Error(`1-13-4) 정산 저장 실패: ${pErr.message}`)
+      if (pErr) throw new Error(`정산 저장 실패: ${pErr.message}`)
 
       setMessage('근무 + 정산 내역이 저장되었습니다.')
       resetForm()
+
+      // ✅ 저장 후 근무내역만 재조회
+      setLogsLoading(true)
       await fetchWorkLogs(staff.id, baseDate)
     } catch (e: any) {
-      setError(e?.message ?? '1-13) 저장 오류')
+      setError(e?.message ?? '저장 오류')
     } finally {
+      setLogsLoading(false)
       setSaving(false)
     }
   }
 
-  // 1-14) 근무 내역 삭제
+  // 1-16) 근무 내역 삭제
   const onDeleteWorkLog = async (workLogId: number) => {
     if (!staff) return
     setError(null)
@@ -330,21 +398,24 @@ export default function AdminStaffDetailPage() {
         .eq('id', workLogId)
         .select('id')
 
-      if (dErr) throw new Error(`1-14-1) 삭제 실패: ${dErr.message}`)
+      if (dErr) throw new Error(`삭제 실패: ${dErr.message}`)
       if (!deletedRows || deletedRows.length === 0) {
-        throw new Error('1-14-2) 삭제 권한이 없거나, 이미 삭제된 항목입니다(RLS 가능성).')
+        throw new Error('삭제 권한이 없거나, 이미 삭제된 항목입니다(RLS 가능성).')
       }
 
       setMessage('삭제되었습니다.')
+
+      setLogsLoading(true)
       await fetchWorkLogs(staff.id, baseDate)
     } catch (e: any) {
-      setError(e?.message ?? '1-14) 삭제 오류')
+      setError(e?.message ?? '삭제 오류')
     } finally {
+      setLogsLoading(false)
       setDeletingId(null)
     }
   }
 
-  // 1-15) ★ 계좌 저장
+  // 1-17) ★ 계좌 저장
   const onSaveBank = async () => {
     if (!staff) return
     setError(null)
@@ -361,7 +432,7 @@ export default function AdminStaffDetailPage() {
         })
         .eq('id', staff.id)
 
-      if (error) throw new Error(`1-15) 계좌 저장 실패: ${error.message}`)
+      if (error) throw new Error(`계좌 저장 실패: ${error.message}`)
 
       setStaff({
         ...staff,
@@ -373,19 +444,20 @@ export default function AdminStaffDetailPage() {
       setMessage('저장되었습니다.')
       setBankOpen(false)
     } catch (e: any) {
-      setError(e?.message ?? '1-15) 오류')
+      setError(e?.message ?? '계좌 저장 오류')
     } finally {
       setBankSaving(false)
     }
   }
 
-  // 1-16) 로그아웃
+  // 1-18) 로그아웃
   const onLogout = async () => {
     await supabaseClient.auth.signOut()
     router.replace('/login')
   }
 
-  if (loading) return <div className="text-sm text-white/60">Loading...</div>
+  // ✅ staff만 로딩 중이면 최소 화면
+  if (staffLoading) return <div className="text-sm text-white/60">Loading...</div>
 
   if (!staff) {
     return (
@@ -437,8 +509,6 @@ export default function AdminStaffDetailPage() {
         }
       />
 
-      {/* 근무 상태 카드/근무 버튼 등: 전부 제거됨 */}
-
       {/* 섹션: 근무/정산 입력 */}
       <GlassCard className="p-6">
         <div className="flex items-start justify-between gap-3">
@@ -465,22 +535,28 @@ export default function AdminStaffDetailPage() {
 
           <div className="relative mt-2">
             <input
-              className="w-full rounded-xl border border-white/12 bg-black/20 px-3 py-2.5 text-white outline-none placeholder:text-white/30 focus:border-white/25"
+              disabled={storesLoading}
+              className={cn(
+                'w-full rounded-xl border border-white/12 bg-black/20 px-3 py-2.5 text-white outline-none placeholder:text-white/30 focus:border-white/25',
+                storesLoading && 'opacity-70 cursor-not-allowed'
+              )}
               value={storeQuery}
               onChange={(e) => {
                 setStoreQuery(e.target.value)
                 setStoreDropdownOpen(true)
                 setSelectedStoreId('')
               }}
-              onFocus={() => setStoreDropdownOpen(true)}
+              onFocus={() => {
+                if (!storesLoading) setStoreDropdownOpen(true)
+              }}
               onBlur={() => {
                 window.setTimeout(() => setStoreDropdownOpen(false), 120)
               }}
-              placeholder="예: ㄱ (초성) / 강남"
+              placeholder={storesLoading ? '가게 목록 불러오는 중...' : '예: ㄱ (초성) / 강남'}
               autoComplete="off"
             />
 
-            {storeDropdownOpen && filteredStores.length > 0 && (
+            {!storesLoading && storeDropdownOpen && filteredStores.length > 0 && (
               <div
                 className={cn(
                   'absolute z-20 mt-2 w-full overflow-hidden rounded-2xl',
@@ -504,6 +580,8 @@ export default function AdminStaffDetailPage() {
               </div>
             )}
           </div>
+
+          {storesLoading && <div className="mt-2 text-xs text-white/45">가게 목록을 불러오는 중입니다…</div>}
         </div>
 
         <div className="mt-5">
@@ -558,7 +636,7 @@ export default function AdminStaffDetailPage() {
         )}
 
         <div className="mt-4">
-          <ProButton onClick={onSave} disabled={saving} className="w-full">
+          <ProButton onClick={onSave} disabled={saving || storesLoading} className="w-full">
             <Save className="mr-2 h-4 w-4" />
             {saving ? '저장 중...' : '근무 + 정산 저장'}
           </ProButton>
@@ -576,53 +654,58 @@ export default function AdminStaffDetailPage() {
         </div>
 
         <div className="mt-4 divide-y divide-white/10">
-          {workLogs.length === 0 && <div className="py-6 text-sm text-white/60">해당 날짜의 근무 내역이 없습니다.</div>}
+          {logsLoading && <div className="py-6 text-sm text-white/60">근무 내역 불러오는 중...</div>}
 
-          {workLogs.map((w) => {
-            const time = toKstTime(new Date(w.work_at))
-            const storeName = w.stores?.name ?? '가게 미지정'
-            const rowAmount = (w.minutes || 0) * 500
+          {!logsLoading && workLogs.length === 0 && (
+            <div className="py-6 text-sm text-white/60">해당 날짜의 근무 내역이 없습니다.</div>
+          )}
 
-            return (
-              <div key={w.id} className="py-4 flex items-center justify-between gap-3">
-                <div className="min-w-0">
-                  <div className="text-white font-semibold">
-                    {time} · {w.minutes}분 · {formatCurrency(rowAmount)}원
-                  </div>
-                  <div className="mt-1 text-sm text-white/55 truncate">{storeName}</div>
-                </div>
+          {!logsLoading &&
+            workLogs.map((w) => {
+              const time = toKstTime(new Date(w.work_at))
+              const storeName = w.stores?.name ?? '가게 미지정'
+              const rowAmount = (w.minutes || 0) * 500
 
-                <div className="shrink-0 flex items-center gap-2">
-                  <div className="flex items-center gap-2 text-white/70">
-                    {w.option_heart && (
-                      <span className="rounded-full border border-white/12 bg-white/5 px-2 py-1 text-xs">♡</span>
-                    )}
-                    {w.option_at && (
-                      <span className="rounded-full border border-white/12 bg-white/5 px-2 py-1 text-xs">@</span>
-                    )}
+              return (
+                <div key={w.id} className="py-4 flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="text-white font-semibold">
+                      {time} · {w.minutes}분 · {formatCurrency(rowAmount)}원
+                    </div>
+                    <div className="mt-1 text-sm text-white/55 truncate">{storeName}</div>
                   </div>
 
-                  <button
-                    onClick={() => onDeleteWorkLog(w.id)}
-                    disabled={deletingId === w.id}
-                    className={cn(
-                      'inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm',
-                      'border border-white/12 bg-white/5 text-white/85 hover:bg-white/10 transition',
-                      'disabled:opacity-60 disabled:cursor-not-allowed'
-                    )}
-                    type="button"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                    {deletingId === w.id ? '삭제 중...' : '삭제'}
-                  </button>
+                  <div className="shrink-0 flex items-center gap-2">
+                    <div className="flex items-center gap-2 text-white/70">
+                      {w.option_heart && (
+                        <span className="rounded-full border border-white/12 bg-white/5 px-2 py-1 text-xs">♡</span>
+                      )}
+                      {w.option_at && (
+                        <span className="rounded-full border border-white/12 bg-white/5 px-2 py-1 text-xs">@</span>
+                      )}
+                    </div>
+
+                    <button
+                      onClick={() => onDeleteWorkLog(w.id)}
+                      disabled={deletingId === w.id}
+                      className={cn(
+                        'inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm',
+                        'border border-white/12 bg-white/5 text-white/85 hover:bg-white/10 transition',
+                        'disabled:opacity-60 disabled:cursor-not-allowed'
+                      )}
+                      type="button"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                      {deletingId === w.id ? '삭제 중...' : '삭제'}
+                    </button>
+                  </div>
                 </div>
-              </div>
-            )
-          })}
+              )
+            })}
         </div>
       </GlassCard>
 
-      {/* ✅ 출퇴근 설정 모달: 현재 트리거 없음(원하면 나중에 다시 버튼/아이콘 연결) */}
+      {/* ✅ 출퇴근 설정 모달: 현재 트리거 없음(원하면 나중에 연결) */}
       {attOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-6">
           <button className="absolute inset-0 bg-black/60" onClick={() => setAttOpen(false)} aria-label="닫기" />
@@ -679,7 +762,13 @@ export default function AdminStaffDetailPage() {
                 )}
 
                 <div className="pt-2 flex gap-2">
-                  <ProButton variant="ghost" className="flex-1" type="button" onClick={() => setAttOpen(false)} disabled={attSaving}>
+                  <ProButton
+                    variant="ghost"
+                    className="flex-1"
+                    type="button"
+                    onClick={() => setAttOpen(false)}
+                    disabled={attSaving}
+                  >
                     취소
                   </ProButton>
                   <ProButton className="flex-1" type="button" onClick={onSaveAttendance} disabled={attSaving}>
@@ -737,7 +826,13 @@ export default function AdminStaffDetailPage() {
                 </div>
 
                 <div className="pt-2 flex gap-2">
-                  <ProButton variant="ghost" className="flex-1" type="button" onClick={() => setBankOpen(false)} disabled={bankSaving}>
+                  <ProButton
+                    variant="ghost"
+                    className="flex-1"
+                    type="button"
+                    onClick={() => setBankOpen(false)}
+                    disabled={bankSaving}
+                  >
                     닫기
                   </ProButton>
                   <ProButton className="flex-1" type="button" onClick={onSaveBank} disabled={bankSaving}>
@@ -761,7 +856,10 @@ function TimeButton({ label, onClick }: { label: string; onClick: () => void }) 
   return (
     <button
       onClick={onClick}
-      className={cn('rounded-xl px-3 py-2.5 text-sm transition border', 'bg-white/5 text-white/85 border-white/12 hover:bg-white/10')}
+      className={cn(
+        'rounded-xl px-3 py-2.5 text-sm transition border',
+        'bg-white/5 text-white/85 border-white/12 hover:bg-white/10'
+      )}
       type="button"
     >
       {label}
@@ -902,7 +1000,7 @@ function getLeadingHangulChosung(name: string) {
   return null
 }
 
-const CHOSUNG = ['ㄱ','ㄲ','ㄴ','ㄷ','ㄸ','ㄹ','ㅁ','ㅂ','ㅃ','ㅅ','ㅆ','ㅇ','ㅈ','ㅉ','ㅊ','ㅋ','ㅌ','ㅍ','ㅎ']
+const CHOSUNG = ['ㄱ', 'ㄲ', 'ㄴ', 'ㄷ', 'ㄸ', 'ㄹ', 'ㅁ', 'ㅂ', 'ㅃ', 'ㅅ', 'ㅆ', 'ㅇ', 'ㅈ', 'ㅉ', 'ㅊ', 'ㅋ', 'ㅌ', 'ㅍ', 'ㅎ']
 
 function getChosung(ch: string) {
   const code = ch.charCodeAt(0)
