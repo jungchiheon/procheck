@@ -161,8 +161,7 @@ export default function AdminStaffPage() {
     <div className="space-y-6">
       {/* 2-1) 헤더(뒤로가기 이미 있음) */}
       <PageHeader
-        title="직원 관리"
-        subtitle="직원 목록"
+        title=""
         backHref="/admin"
         right={
           <div className="flex items-center gap-2">
