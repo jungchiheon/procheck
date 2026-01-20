@@ -104,7 +104,7 @@ export default function StaffChatListPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="1:1 채팅" subtitle="관리자 선택" backHref="/staff" />
+      <PageHeader title="채팅" subtitle="관리자 선택" backHref="/staff" />
 
       <GlassCard className="p-4">
         <input

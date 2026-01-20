@@ -174,7 +174,7 @@ export default function StaffHomePage() {
             className="relative rounded-2xl border border-white/10 bg-white/5 p-5 text-left hover:bg-white/10 transition"
             type="button"
           >
-            <RowIcon2 icon={<MessageCircle className="h-5 w-5 text-white/80" />} title="1:1 채팅" desc="" />
+            <RowIcon2 icon={<MessageCircle className="h-5 w-5 text-white/80" />} title="채팅" desc="" />
 
             {chatUnread > 0 && (
               <div className="absolute top-4 right-4 min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[11px] flex items-center justify-center">

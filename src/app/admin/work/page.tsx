@@ -99,7 +99,7 @@ export default function AdminWorkPage() {
       {/* 3-2-6) 헤더 */}
       <PageHeader
         title="업무 메모"
-        subtitle="입력 후 0.5초 정지 시 자동 저장됩니다."
+        subtitle="자동 저장중입니다."
         backHref="/admin"
         right={
           <div className="flex items-center gap-3">

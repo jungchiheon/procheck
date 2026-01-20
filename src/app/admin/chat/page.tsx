@@ -105,7 +105,7 @@ export default function AdminChatListPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="1:1 채팅" subtitle="직원 선택" backHref="/admin" />
+      <PageHeader title="채팅" subtitle="직원 선택" backHref="/admin" />
 
       <GlassCard className="p-4">
         <input

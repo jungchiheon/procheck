@@ -2,7 +2,6 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { supabaseClient } from '@/lib/supabaseClient'
 import { GlassCard } from '@/components/ui/GlassCard'
@@ -22,35 +21,65 @@ type StaffRow = {
   last_checkout_at: string | null
 }
 
-type SortMode = 'name' | 'working'
+type SortMode = 'visit' | 'working'
+
+const VISIT_KEY = 'pc_admin_staff_last_visit_v1'
+const STAFF_CACHE_KEY = 'pc_admin_staff_rows_v1'
+const STAFF_CACHE_TTL_MS = 30 * 1000 // 30초 캐시(체감 렌더 속도용)
 
 export default function AdminStaffPage() {
-  // 1-1) router
   const router = useRouter()
 
-  // 1-2) 상태
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  const [sortMode, setSortMode] = useState<SortMode>('name')
   const [rows, setRows] = useState<StaffRow[]>([])
 
-  // 1-3) 직원 추가 모달
+  // ✅ 정렬 모드(변경순/출근순)
+  const [sortMode, setSortMode] = useState<SortMode>('visit')
+
+  // “몇 분 전” 갱신용(1분에 1번만)
+  const [nowTick, setNowTick] = useState(Date.now())
+
+  // 최근 방문(변경순) 저장소(localStorage)
+  const [visitMap, setVisitMap] = useState<Record<string, number>>({})
+
+  // 직원 추가 모달
   const [open, setOpen] = useState(false)
   const [loginId, setLoginId] = useState('')
   const [password, setPassword] = useState('')
   const [nickname, setNickname] = useState('')
   const [creating, setCreating] = useState(false)
 
-  // 1-4) 최초 로드
   useEffect(() => {
+    const t = window.setInterval(() => setNowTick(Date.now()), 60_000)
+    return () => window.clearInterval(t)
+  }, [])
+
+  // localStorage 방문기록 로드
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(VISIT_KEY)
+      if (!raw) return
+      const parsed = JSON.parse(raw)
+      if (parsed && typeof parsed === 'object') setVisitMap(parsed)
+    } catch {
+      // ignore
+    }
+  }, [])
+
+  // 최초 로드
+  useEffect(() => {
+    let alive = true
+
     ;(async () => {
       setLoading(true)
       setError(null)
+
       try {
-        // 1-4-1) 세션/관리자 확인
+        // 1) 세션/관리자 확인
         const { data: userData, error: userErr } = await supabaseClient.auth.getUser()
-        if (userErr || !userData.user) throw new Error('1-4-1) 세션 없음: 다시 로그인 필요')
+        if (userErr || !userData.user) throw new Error('로그인 만료')
 
         const { data: prof, error: profErr } = await supabaseClient
           .from('user_profiles')
@@ -58,58 +87,144 @@ export default function AdminStaffPage() {
           .eq('id', userData.user.id)
           .maybeSingle()
 
-        if (profErr) throw new Error(`1-4-1) 관리자 프로필 조회 실패: ${profErr.message}`)
-        if (!prof) throw new Error('1-4-1) user_profiles에 내 row 없음')
-        if (!prof.is_active) throw new Error('1-4-1) 비활성 계정')
-        if (prof.role !== 'admin') throw new Error('1-4-1) 관리자만 접근 가능')
+        if (profErr) throw new Error(`관리자 프로필 조회 실패: ${profErr.message}`)
+        if (!prof) throw new Error('user_profiles에 내 row 없음')
+        if (!prof.is_active) throw new Error('비활성 계정')
+        if (prof.role !== 'admin') throw new Error('관리자만 접근 가능')
 
-        // 1-4-2) 직원 목록 로드
-        await fetchStaff()
+        // 2) 캐시 우선 렌더
+        const cached = readStaffCache()
+        if (cached?.rows?.length) {
+          if (!alive) return
+          setRows(cached.rows)
+          setLoading(false)
+        }
+
+        // 3) 최신 목록 로드(캐시 갱신)
+        await fetchStaff({ alive })
+
+        if (!alive) return
+        setLoading(false)
       } catch (e: any) {
-        setError(e?.message ?? '1-4) 오류')
-      } finally {
+        if (!alive) return
+        setError(e?.message ?? '오류')
         setLoading(false)
       }
     })()
+
+    return () => {
+      alive = false
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // 1-5) 직원 목록 로드 함수
-  const fetchStaff = async () => {
+  const readStaffCache = (): { ts: number; rows: StaffRow[] } | null => {
+    try {
+      const raw = sessionStorage.getItem(STAFF_CACHE_KEY)
+      if (!raw) return null
+      const parsed = JSON.parse(raw)
+      if (!parsed?.ts || !Array.isArray(parsed?.rows)) return null
+      if (Date.now() - Number(parsed.ts) > STAFF_CACHE_TTL_MS) return null
+      return { ts: Number(parsed.ts), rows: parsed.rows as StaffRow[] }
+    } catch {
+      return null
+    }
+  }
+
+  const writeStaffCache = (list: StaffRow[]) => {
+    try {
+      sessionStorage.setItem(STAFF_CACHE_KEY, JSON.stringify({ ts: Date.now(), rows: list }))
+    } catch {
+      // ignore
+    }
+  }
+
+  // 직원 목록 로드
+  const fetchStaff = async (opts?: { alive: boolean }) => {
     const { data, error } = await supabaseClient
       .from('user_profiles')
       .select('id, login_id, nickname, role, is_active, last_checkin_at, last_checkout_at')
       .eq('role', 'staff')
       .eq('is_active', true)
 
-    if (error) throw new Error(`1-5) staff 목록 조회 실패: ${error.message}`)
-    setRows((data as StaffRow[]) ?? [])
+    if (error) throw new Error(`staff 목록 조회 실패: ${error.message}`)
+
+    const list = (data as StaffRow[]) ?? []
+    if (opts && !opts.alive) return
+
+    setRows(list)
+    writeStaffCache(list)
   }
 
-  // 1-6) 근무중 판정
+  // 근무중 판정
   const isWorking = (r: StaffRow) => {
     if (!r.last_checkin_at) return false
     if (!r.last_checkout_at) return true
     return new Date(r.last_checkin_at) > new Date(r.last_checkout_at)
   }
 
-  // 1-7) 정렬된 목록
+  // 출근/퇴근 “상태 변화 시각” (출근 중이면 checkin, 아니면 checkout 우선)
+  const lastActivityMs = (r: StaffRow) => {
+    const working = isWorking(r)
+    const baseIso = working ? r.last_checkin_at : (r.last_checkout_at ?? r.last_checkin_at)
+    const t = baseIso ? new Date(baseIso).getTime() : 0
+    return Number.isFinite(t) ? t : 0
+  }
+
+  // “몇 분 전” 라벨
+  const sinceText = (r: StaffRow) => {
+    const working = isWorking(r)
+    const baseIso = working ? r.last_checkin_at : r.last_checkout_at ?? r.last_checkin_at
+    if (!baseIso) return ''
+    return formatSince(baseIso, nowTick)
+  }
+
+  // ✅ 정렬 적용(변경순/출근순)
   const sorted = useMemo(() => {
     const list = [...rows]
+
     if (sortMode === 'working') {
       list.sort((a, b) => {
         const aw = isWorking(a) ? 0 : 1
         const bw = isWorking(b) ? 0 : 1
-        if (aw !== bw) return aw - bw
+        if (aw !== bw) return aw - bw // 출근중 우선
+        const at = lastActivityMs(a)
+        const bt = lastActivityMs(b)
+        if (at !== bt) return bt - at // 최근 활동 우선
         return (a.nickname || '').localeCompare(b.nickname || '', 'ko')
       })
       return list
     }
-    list.sort((a, b) => (a.nickname || '').localeCompare(b.nickname || '', 'ko'))
-    return list
-  }, [rows, sortMode])
 
-  // 1-8) 직원 추가 제출
+    // visit(변경순)
+    list.sort((a, b) => {
+      const av = Number(visitMap[a.id] ?? 0)
+      const bv = Number(visitMap[b.id] ?? 0)
+      if (av !== bv) return bv - av
+      return (a.nickname || '').localeCompare(b.nickname || '', 'ko')
+    })
+
+    return list
+  }, [rows, visitMap, sortMode])
+
+  // 상위 일부 prefetch
+  useEffect(() => {
+    const top = sorted.slice(0, 10)
+    top.forEach((s) => router.prefetch(`/admin/staff/${s.id}`))
+  }, [router, sorted])
+
+  // 카드 클릭 시 방문기록 저장
+  const markVisited = (staffId: string) => {
+    const next = { ...visitMap, [staffId]: Date.now() }
+    setVisitMap(next)
+    try {
+      localStorage.setItem(VISIT_KEY, JSON.stringify(next))
+    } catch {
+      // ignore
+    }
+  }
+
+  // 직원 추가 제출
   const onCreate = async () => {
     setError(null)
     setCreating(true)
@@ -118,13 +233,13 @@ export default function AdminStaffPage() {
       const pw = password
       const nn = nickname.trim()
 
-      if (!id) throw new Error('1-8-1) 로그인ID를 입력하세요.')
-      if (!pw) throw new Error('1-8-1) 비밀번호를 입력하세요.')
-      if (!nn) throw new Error('1-8-1) 닉네임을 입력하세요.')
+      if (!id) throw new Error('ID를 입력하세요.')
+      if (!pw) throw new Error('비밀번호를 입력하세요.')
+      if (!nn) throw new Error('닉네임을 입력하세요.')
 
       const { data: session } = await supabaseClient.auth.getSession()
       const token = session.session?.access_token
-      if (!token) throw new Error('1-8-2) 세션 없음: 다시 로그인 필요')
+      if (!token) throw new Error('로그인 만료')
 
       const res = await fetch('/api/admin/create-staff', {
         method: 'POST',
@@ -136,7 +251,7 @@ export default function AdminStaffPage() {
       })
 
       const json = await res.json().catch(() => ({}))
-      if (!res.ok) throw new Error(json?.error || '1-8-3) 직원 생성 실패')
+      if (!res.ok) throw new Error(json?.error || '직원 생성 실패')
 
       setOpen(false)
       setLoginId('')
@@ -145,13 +260,13 @@ export default function AdminStaffPage() {
 
       await fetchStaff()
     } catch (e: any) {
-      setError(e?.message ?? '1-8) 오류')
+      setError(e?.message ?? '오류')
     } finally {
       setCreating(false)
     }
   }
 
-  // 1-9) 로그아웃
+  // 로그아웃
   const onLogout = async () => {
     await supabaseClient.auth.signOut()
     router.replace('/login')
@@ -159,7 +274,6 @@ export default function AdminStaffPage() {
 
   return (
     <div className="space-y-6">
-      {/* 2-1) 헤더(뒤로가기 이미 있음) */}
       <PageHeader
         title=""
         backHref="/admin"
@@ -173,57 +287,59 @@ export default function AdminStaffPage() {
         }
       />
 
-      {/* 2-2) 상단 탭: “관리자 메인” 제거 */}
+      {/* 상단 탭 */}
       <div className="flex items-center gap-2">
         <span className="rounded-xl border border-white/12 bg-white/10 px-4 py-2 text-sm text-white font-semibold">
           직원 관리
         </span>
-        <Link
-          href="/admin/stores"
-          className="rounded-xl border border-white/12 bg-white/5 px-4 py-2 text-sm text-white/80 hover:bg-white/10 transition"
+        <span
+          className={cn(
+            'rounded-xl border border-white/12 bg-white/5 px-4 py-2 text-sm',
+            'text-white/50 cursor-not-allowed'
+          )}
+          title="준비 중"
         >
-          가게 관리
-        </Link>
+          매출 관리
+        </span>
       </div>
 
-      {/* 2-3) 로딩/에러 */}
       {loading && (
-        <GlassCard className="p-6">
+        <GlassCard className="p-5">
           <div className="text-sm text-white/60">Loading...</div>
         </GlassCard>
       )}
       {error && (
-        <GlassCard className="p-6">
+        <GlassCard className="p-5">
           <div className="text-sm text-red-200">{error}</div>
         </GlassCard>
       )}
 
-      {/* 2-4) 본문 */}
       {!loading && !error && (
-        <GlassCard className="p-6">
+        <GlassCard className="p-5">
           <div className="flex items-center justify-between gap-3">
             <div className="text-white font-semibold tracking-tight">직원 목록</div>
 
+            {/* ✅ 변경순 / 출근순 토글 */}
             <div className="flex items-center gap-2">
               <button
-                onClick={() => setSortMode('name')}
+                onClick={() => setSortMode('visit')}
                 className={cn(
-                  'rounded-xl px-3 py-2 text-sm border transition',
-                  sortMode === 'name'
+                  'rounded-lg px-3 py-1.5 text-sm border transition',
+                  sortMode === 'visit'
                     ? 'bg-white text-zinc-900 border-white/0'
-                    : 'bg-white/5 text-white/85 border-white/12 hover:bg-white/10'
+                    : 'bg-white/5 text-white/80 border-white/12 hover:bg-white/10'
                 )}
                 type="button"
               >
-                가나다순
+                변경순
               </button>
               <button
                 onClick={() => setSortMode('working')}
                 className={cn(
-                  'rounded-xl px-3 py-2 text-sm border transition',
+                  'rounded-lg px-3 py-1.5 text-sm border transition',
                   sortMode === 'working'
                     ? 'bg-white text-zinc-900 border-white/0'
-                    : 'bg-white/5 text-white/85 border-white/12 hover:bg-white/10'
+                    : 'bg-white/5 text-white/80 border-white/12 hover:bg-white/10'
                 )}
                 type="button"
               >
@@ -232,35 +348,45 @@ export default function AdminStaffPage() {
             </div>
           </div>
 
-          <div className="mt-4 divide-y divide-white/10">
-            {sorted.length === 0 && (
-              <div className="py-6 text-sm text-white/60">직원이 없습니다.</div>
-            )}
+          <div className="mt-3 divide-y divide-white/10">
+            {sorted.length === 0 && <div className="py-5 text-sm text-white/60">직원이 없습니다.</div>}
 
             {sorted.map((s) => {
               const working = isWorking(s)
+              const since = sinceText(s)
+
               return (
                 <button
                   key={s.id}
-                  onClick={() => router.push(`/admin/staff/${s.id}`)}
-                  className="w-full text-left py-4 hover:bg-white/5 transition px-2 rounded-xl"
+                  onClick={() => {
+                    markVisited(s.id)
+                    router.push(`/admin/staff/${s.id}`)
+                  }}
+                  className={cn(
+                    'w-full text-left rounded-xl transition',
+                    'px-2 py-3 hover:bg-white/5' // ✅ 간격 줄임
+                  )}
                   type="button"
                 >
                   <div className="flex items-center justify-between gap-3">
                     <div className="min-w-0">
-                      <div className="text-white text-base font-semibold truncate">{s.nickname}</div>
-                      <div className="mt-1 text-xs text-white/35 truncate">{s.login_id}</div>
+                      <div className="text-white text-sm font-semibold truncate">{s.nickname}</div>
+                      <div className="mt-0.5 text-[11px] text-white/35 truncate">{s.login_id}</div>
                     </div>
 
-                    <div
-                      className={cn(
-                        'shrink-0 rounded-full px-3 py-1 text-xs border',
-                        working
-                          ? 'border-emerald-300/30 bg-emerald-500/10 text-emerald-100'
-                          : 'border-white/12 bg-white/5 text-white/60'
-                      )}
-                    >
-                      {working ? '출근 중' : '대기/퇴근'}
+                    <div className="shrink-0 flex items-center gap-2">
+                      {since && <div className="text-[11px] text-white/45 whitespace-nowrap">{since}</div>}
+                      <div
+                        className={cn(
+                          'rounded-full border whitespace-nowrap',
+                          'px-2.5 py-1 text-[11px]', // ✅ 칩도 더 촘촘하게
+                          working
+                            ? 'border-emerald-300/30 bg-emerald-500/10 text-emerald-100'
+                            : 'border-white/12 bg-white/5 text-white/60'
+                        )}
+                      >
+                        {working ? '출근 중' : '대기/퇴근'}
+                      </div>
                     </div>
                   </div>
                 </button>
@@ -270,7 +396,7 @@ export default function AdminStaffPage() {
         </GlassCard>
       )}
 
-      {/* 2-5) 플로팅 + 버튼 */}
+      {/* 플로팅 + 버튼 */}
       <button
         onClick={() => setOpen(true)}
         className={cn(
@@ -284,15 +410,10 @@ export default function AdminStaffPage() {
         <Plus className="h-6 w-6 mx-auto" />
       </button>
 
-      {/* 2-6) 직원 추가 모달 */}
+      {/* 직원 추가 모달 */}
       {open && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-6">
-          <button
-            className="absolute inset-0 bg-black/60"
-            onClick={() => setOpen(false)}
-            type="button"
-            aria-label="닫기"
-          />
+          <button className="absolute inset-0 bg-black/60" onClick={() => setOpen(false)} type="button" aria-label="닫기" />
           <div className="relative w-full max-w-md">
             <GlassCard className="p-6">
               <div className="flex items-start justify-between gap-3">
@@ -346,12 +467,7 @@ export default function AdminStaffPage() {
                 </div>
 
                 <div className="pt-2 flex gap-2">
-                  <ProButton
-                    variant="ghost"
-                    className="flex-1"
-                    onClick={() => setOpen(false)}
-                    type="button"
-                  >
+                  <ProButton variant="ghost" className="flex-1" onClick={() => setOpen(false)} type="button">
                     취소
                   </ProButton>
                   <ProButton className="flex-1" onClick={onCreate} disabled={creating} type="button">
@@ -365,4 +481,22 @@ export default function AdminStaffPage() {
       )}
     </div>
   )
+}
+
+/* -------------------------
+   시간 표시 유틸
+------------------------- */
+
+function formatSince(iso: string, nowMs: number) {
+  const t = new Date(iso).getTime()
+  if (!Number.isFinite(t)) return ''
+  const diffSec = Math.max(0, Math.floor((nowMs - t) / 1000))
+
+  if (diffSec < 30) return '방금'
+  const diffMin = Math.floor(diffSec / 60)
+  if (diffMin < 60) return `${diffMin}분 전`
+  const diffHour = Math.floor(diffMin / 60)
+  if (diffHour < 24) return `${diffHour}시간 전`
+  const diffDay = Math.floor(diffHour / 24)
+  return `${diffDay}일 전`
 }
