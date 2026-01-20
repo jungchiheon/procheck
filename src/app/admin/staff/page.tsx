@@ -1,7 +1,6 @@
-// src/app/admin/staff/page.tsx
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabaseClient } from '@/lib/supabaseClient'
 import { GlassCard } from '@/components/ui/GlassCard'
@@ -15,8 +14,6 @@ type StaffRow = {
   id: string
   login_id: string
   nickname: string
-  role: 'admin' | 'staff'
-  is_active: boolean
   last_checkin_at: string | null
   last_checkout_at: string | null
 }
@@ -24,24 +21,22 @@ type StaffRow = {
 type SortMode = 'visit' | 'working'
 
 const VISIT_KEY = 'pc_admin_staff_last_visit_v1'
-const STAFF_CACHE_KEY = 'pc_admin_staff_rows_v1'
-const STAFF_CACHE_TTL_MS = 30 * 1000 // 30초 캐시(체감 렌더 속도용)
+const STAFF_CACHE_KEY = 'pc_admin_staff_rows_v2'
+const STAFF_CACHE_TTL_MS = 60 * 1000 // 60초(웹 체감용)
+const PREFETCH_TOP_N = 6
+const PAGE_CHUNK = 40
 
 export default function AdminStaffPage() {
   const router = useRouter()
+  const [isPending, startTransition] = useTransition()
 
-  const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [syncing, setSyncing] = useState(false)
 
   const [rows, setRows] = useState<StaffRow[]>([])
-
-  // ✅ 정렬 모드(변경순/출근순)
   const [sortMode, setSortMode] = useState<SortMode>('visit')
 
-  // “몇 분 전” 갱신용(1분에 1번만)
   const [nowTick, setNowTick] = useState(Date.now())
-
-  // 최근 방문(변경순) 저장소(localStorage)
   const [visitMap, setVisitMap] = useState<Record<string, number>>({})
 
   // 직원 추가 모달
@@ -51,127 +46,104 @@ export default function AdminStaffPage() {
   const [nickname, setNickname] = useState('')
   const [creating, setCreating] = useState(false)
 
+  // 점진 렌더
+  const [renderCount, setRenderCount] = useState(PAGE_CHUNK)
+  const sentinelRef = useRef<HTMLDivElement | null>(null)
+
+  // prefetch 중복 방지
+  const lastPrefetchKeyRef = useRef<string>('')
+
+  // “몇 분 전” 갱신
   useEffect(() => {
     const t = window.setInterval(() => setNowTick(Date.now()), 60_000)
     return () => window.clearInterval(t)
   }, [])
 
-  // localStorage 방문기록 로드
+  // 방문기록/캐시 선로딩 (화면 즉시)
   useEffect(() => {
+    // visitMap
     try {
       const raw = localStorage.getItem(VISIT_KEY)
-      if (!raw) return
-      const parsed = JSON.parse(raw)
-      if (parsed && typeof parsed === 'object') setVisitMap(parsed)
+      if (raw) {
+        const parsed = JSON.parse(raw)
+        if (parsed && typeof parsed === 'object') setVisitMap(parsed)
+      }
     } catch {
       // ignore
     }
+
+    // staff cache
+    const cached = ssRead<{ ts: number; rows: StaffRow[] }>(STAFF_CACHE_KEY, STAFF_CACHE_TTL_MS)
+    if (cached?.rows?.length) setRows(cached.rows)
   }, [])
 
-  // 최초 로드
+  // 최초 동기화(웹 기준)
   useEffect(() => {
     let alive = true
-
     ;(async () => {
-      setLoading(true)
       setError(null)
-
+      setSyncing(true)
       try {
-        // 1) 세션/관리자 확인
-        const { data: userData, error: userErr } = await supabaseClient.auth.getUser()
-        if (userErr || !userData.user) throw new Error('로그인 만료')
+        const { data: sess } = await supabaseClient.auth.getSession()
+        const uid = sess.session?.user?.id
+        if (!uid) throw new Error('로그인 만료')
 
-        const { data: prof, error: profErr } = await supabaseClient
+        const profQ = supabaseClient
           .from('user_profiles')
           .select('role, is_active')
-          .eq('id', userData.user.id)
+          .eq('id', uid)
           .maybeSingle()
+
+        const staffQ = supabaseClient
+          .from('user_profiles')
+          .select('id, login_id, nickname, last_checkin_at, last_checkout_at')
+          .eq('role', 'staff')
+          .eq('is_active', true)
+
+        const [{ data: prof, error: profErr }, { data: staffRows, error: staffErr }] = await Promise.all([profQ, staffQ])
+
+        if (!alive) return
 
         if (profErr) throw new Error(`관리자 프로필 조회 실패: ${profErr.message}`)
         if (!prof) throw new Error('user_profiles에 내 row 없음')
         if (!prof.is_active) throw new Error('비활성 계정')
         if (prof.role !== 'admin') throw new Error('관리자만 접근 가능')
 
-        // 2) 캐시 우선 렌더
-        const cached = readStaffCache()
-        if (cached?.rows?.length) {
-          if (!alive) return
-          setRows(cached.rows)
-          setLoading(false)
-        }
+        if (staffErr) throw new Error(`staff 목록 조회 실패: ${staffErr.message}`)
 
-        // 3) 최신 목록 로드(캐시 갱신)
-        await fetchStaff({ alive })
+        const list = normalizeStaffRows(staffRows)
+        setRows(list)
+        ssWrite(STAFF_CACHE_KEY, { ts: Date.now(), rows: list })
 
-        if (!alive) return
-        setLoading(false)
+        // 렌더카운트 리셋(직원 많아도 첫 진입 가볍게)
+        setRenderCount(PAGE_CHUNK)
       } catch (e: any) {
         if (!alive) return
         setError(e?.message ?? '오류')
-        setLoading(false)
+      } finally {
+        if (!alive) return
+        setSyncing(false)
       }
     })()
 
     return () => {
       alive = false
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  const readStaffCache = (): { ts: number; rows: StaffRow[] } | null => {
-    try {
-      const raw = sessionStorage.getItem(STAFF_CACHE_KEY)
-      if (!raw) return null
-      const parsed = JSON.parse(raw)
-      if (!parsed?.ts || !Array.isArray(parsed?.rows)) return null
-      if (Date.now() - Number(parsed.ts) > STAFF_CACHE_TTL_MS) return null
-      return { ts: Number(parsed.ts), rows: parsed.rows as StaffRow[] }
-    } catch {
-      return null
-    }
-  }
-
-  const writeStaffCache = (list: StaffRow[]) => {
-    try {
-      sessionStorage.setItem(STAFF_CACHE_KEY, JSON.stringify({ ts: Date.now(), rows: list }))
-    } catch {
-      // ignore
-    }
-  }
-
-  // 직원 목록 로드
-  const fetchStaff = async (opts?: { alive: boolean }) => {
-    const { data, error } = await supabaseClient
-      .from('user_profiles')
-      .select('id, login_id, nickname, role, is_active, last_checkin_at, last_checkout_at')
-      .eq('role', 'staff')
-      .eq('is_active', true)
-
-    if (error) throw new Error(`staff 목록 조회 실패: ${error.message}`)
-
-    const list = (data as StaffRow[]) ?? []
-    if (opts && !opts.alive) return
-
-    setRows(list)
-    writeStaffCache(list)
-  }
-
-  // 근무중 판정
   const isWorking = (r: StaffRow) => {
     if (!r.last_checkin_at) return false
     if (!r.last_checkout_at) return true
     return new Date(r.last_checkin_at) > new Date(r.last_checkout_at)
   }
 
-  // 출근/퇴근 “상태 변화 시각” (출근 중이면 checkin, 아니면 checkout 우선)
   const lastActivityMs = (r: StaffRow) => {
     const working = isWorking(r)
-    const baseIso = working ? r.last_checkin_at : (r.last_checkout_at ?? r.last_checkin_at)
+    const baseIso = working ? r.last_checkin_at : r.last_checkout_at ?? r.last_checkin_at
     const t = baseIso ? new Date(baseIso).getTime() : 0
     return Number.isFinite(t) ? t : 0
   }
 
-  // “몇 분 전” 라벨
   const sinceText = (r: StaffRow) => {
     const working = isWorking(r)
     const baseIso = working ? r.last_checkin_at : r.last_checkout_at ?? r.last_checkin_at
@@ -179,52 +151,74 @@ export default function AdminStaffPage() {
     return formatSince(baseIso, nowTick)
   }
 
-  // ✅ 정렬 적용(변경순/출근순)
   const sorted = useMemo(() => {
     const list = [...rows]
-
     if (sortMode === 'working') {
       list.sort((a, b) => {
         const aw = isWorking(a) ? 0 : 1
         const bw = isWorking(b) ? 0 : 1
-        if (aw !== bw) return aw - bw // 출근중 우선
+        if (aw !== bw) return aw - bw
         const at = lastActivityMs(a)
         const bt = lastActivityMs(b)
-        if (at !== bt) return bt - at // 최근 활동 우선
+        if (at !== bt) return bt - at
         return (a.nickname || '').localeCompare(b.nickname || '', 'ko')
       })
       return list
     }
 
-    // visit(변경순)
     list.sort((a, b) => {
       const av = Number(visitMap[a.id] ?? 0)
       const bv = Number(visitMap[b.id] ?? 0)
       if (av !== bv) return bv - av
       return (a.nickname || '').localeCompare(b.nickname || '', 'ko')
     })
-
     return list
   }, [rows, visitMap, sortMode])
 
-  // 상위 일부 prefetch
+  // 점진 렌더 sentinel
   useEffect(() => {
-    const top = sorted.slice(0, 10)
-    top.forEach((s) => router.prefetch(`/admin/staff/${s.id}`))
+    const el = sentinelRef.current
+    if (!el) return
+
+    const io = new IntersectionObserver(
+      (entries) => {
+        const hit = entries.some((e) => e.isIntersecting)
+        if (hit) {
+          setRenderCount((c) => Math.min(sorted.length, c + PAGE_CHUNK))
+        }
+      },
+      { root: null, threshold: 0.1 }
+    )
+
+    io.observe(el)
+    return () => io.disconnect()
+  }, [sorted.length])
+
+  // 상위 일부 prefetch (렌더 안 막게 idle)
+  useEffect(() => {
+    const top = sorted.slice(0, PREFETCH_TOP_N)
+    const key = top.map((x) => x.id).join(',')
+    if (!key || key === lastPrefetchKeyRef.current) return
+    lastPrefetchKeyRef.current = key
+
+    const run = () => top.forEach((s) => router.prefetch(`/admin/staff/${s.id}`))
+    idle(run)
   }, [router, sorted])
 
-  // 카드 클릭 시 방문기록 저장
-  const markVisited = (staffId: string) => {
+  // 클릭 시 visitMap 저장은 idle로 (클릭 딜레이 제거)
+  const markVisitedIdle = (staffId: string) => {
     const next = { ...visitMap, [staffId]: Date.now() }
-    setVisitMap(next)
-    try {
-      localStorage.setItem(VISIT_KEY, JSON.stringify(next))
-    } catch {
-      // ignore
-    }
+    idle(() => {
+      setVisitMap(next)
+      try {
+        localStorage.setItem(VISIT_KEY, JSON.stringify(next))
+      } catch {
+        // ignore
+      }
+    })
   }
 
-  // 직원 추가 제출
+  // 직원 추가
   const onCreate = async () => {
     setError(null)
     setCreating(true)
@@ -243,10 +237,7 @@ export default function AdminStaffPage() {
 
       const res = await fetch('/api/admin/create-staff', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ loginId: id, password: pw, nickname: nn }),
       })
 
@@ -258,19 +249,33 @@ export default function AdminStaffPage() {
       setPassword('')
       setNickname('')
 
-      await fetchStaff()
+      // 즉시 반영을 위해 재동기화
+      setSyncing(true)
+      const { data, error } = await supabaseClient
+        .from('user_profiles')
+        .select('id, login_id, nickname, last_checkin_at, last_checkout_at')
+        .eq('role', 'staff')
+        .eq('is_active', true)
+      if (error) throw new Error(`staff 목록 조회 실패: ${error.message}`)
+
+      const list = normalizeStaffRows(data)
+      setRows(list)
+      ssWrite(STAFF_CACHE_KEY, { ts: Date.now(), rows: list })
+      setRenderCount(PAGE_CHUNK)
     } catch (e: any) {
       setError(e?.message ?? '오류')
     } finally {
       setCreating(false)
+      setSyncing(false)
     }
   }
 
-  // 로그아웃
   const onLogout = async () => {
     await supabaseClient.auth.signOut()
     router.replace('/login')
   }
+
+  const visible = sorted.slice(0, renderCount)
 
   return (
     <div className="space-y-6">
@@ -287,116 +292,103 @@ export default function AdminStaffPage() {
         }
       />
 
-      {/* 상단 탭 */}
       <div className="flex items-center gap-2">
         <span className="rounded-xl border border-white/12 bg-white/10 px-4 py-2 text-sm text-white font-semibold">
           직원 관리
         </span>
-        <span
-          className={cn(
-            'rounded-xl border border-white/12 bg-white/5 px-4 py-2 text-sm',
-            'text-white/50 cursor-not-allowed'
-          )}
-          title="준비 중"
-        >
+        <span className={cn('rounded-xl border border-white/12 bg-white/5 px-4 py-2 text-sm', 'text-white/50 cursor-not-allowed')} title="준비 중">
           매출 관리
         </span>
+
+        <div className="flex-1" />
+        <div className="text-xs text-white/40">{syncing ? '동기화 중…' : '\u00A0'}</div>
       </div>
 
-      {loading && (
-        <GlassCard className="p-5">
-          <div className="text-sm text-white/60">Loading...</div>
-        </GlassCard>
-      )}
       {error && (
         <GlassCard className="p-5">
           <div className="text-sm text-red-200">{error}</div>
         </GlassCard>
       )}
 
-      {!loading && !error && (
-        <GlassCard className="p-5">
-          <div className="flex items-center justify-between gap-3">
-            <div className="text-white font-semibold tracking-tight">직원 목록</div>
+      <GlassCard className="p-5">
+        <div className="flex items-center justify-between gap-3">
+          <div className="text-white font-semibold tracking-tight">직원 목록</div>
 
-            {/* ✅ 변경순 / 출근순 토글 */}
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setSortMode('visit')}
-                className={cn(
-                  'rounded-lg px-3 py-1.5 text-sm border transition',
-                  sortMode === 'visit'
-                    ? 'bg-white text-zinc-900 border-white/0'
-                    : 'bg-white/5 text-white/80 border-white/12 hover:bg-white/10'
-                )}
-                type="button"
-              >
-                변경순
-              </button>
-              <button
-                onClick={() => setSortMode('working')}
-                className={cn(
-                  'rounded-lg px-3 py-1.5 text-sm border transition',
-                  sortMode === 'working'
-                    ? 'bg-white text-zinc-900 border-white/0'
-                    : 'bg-white/5 text-white/80 border-white/12 hover:bg-white/10'
-                )}
-                type="button"
-              >
-                출근순
-              </button>
-            </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setSortMode('visit')}
+              className={cn(
+                'rounded-lg px-3 py-1.5 text-sm border transition',
+                sortMode === 'visit' ? 'bg-white text-zinc-900 border-white/0' : 'bg-white/5 text-white/80 border-white/12 hover:bg-white/10'
+              )}
+              type="button"
+            >
+              변경순
+            </button>
+            <button
+              onClick={() => setSortMode('working')}
+              className={cn(
+                'rounded-lg px-3 py-1.5 text-sm border transition',
+                sortMode === 'working' ? 'bg-white text-zinc-900 border-white/0' : 'bg-white/5 text-white/80 border-white/12 hover:bg-white/10'
+              )}
+              type="button"
+            >
+              출근순
+            </button>
           </div>
+        </div>
 
-          <div className="mt-3 divide-y divide-white/10">
-            {sorted.length === 0 && <div className="py-5 text-sm text-white/60">직원이 없습니다.</div>}
+        <div className="mt-3 divide-y divide-white/10">
+          {visible.length === 0 && (
+            <div className="py-5 text-sm text-white/60">
+              {syncing ? '불러오는 중…' : '직원이 없습니다.'}
+            </div>
+          )}
 
-            {sorted.map((s) => {
-              const working = isWorking(s)
-              const since = sinceText(s)
+          {visible.map((s) => {
+            const working = isWorking(s)
+            const since = sinceText(s)
+            return (
+              <button
+                key={s.id}
+                onClick={() => {
+                  // ✅ 클릭 즉시 라우팅(렌더 막는 작업은 idle)
+                  startTransition(() => router.push(`/admin/staff/${s.id}`))
+                  markVisitedIdle(s.id)
+                }}
+                className={cn('w-full text-left rounded-xl transition', 'px-2 py-2.5 hover:bg-white/5')}
+                type="button"
+                disabled={isPending}
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="text-white text-sm font-semibold truncate">{s.nickname}</div>
+                    <div className="mt-0.5 text-[11px] text-white/35 truncate">{s.login_id}</div>
+                  </div>
 
-              return (
-                <button
-                  key={s.id}
-                  onClick={() => {
-                    markVisited(s.id)
-                    router.push(`/admin/staff/${s.id}`)
-                  }}
-                  className={cn(
-                    'w-full text-left rounded-xl transition',
-                    'px-2 py-3 hover:bg-white/5' // ✅ 간격 줄임
-                  )}
-                  type="button"
-                >
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="min-w-0">
-                      <div className="text-white text-sm font-semibold truncate">{s.nickname}</div>
-                      <div className="mt-0.5 text-[11px] text-white/35 truncate">{s.login_id}</div>
-                    </div>
-
-                    <div className="shrink-0 flex items-center gap-2">
-                      {since && <div className="text-[11px] text-white/45 whitespace-nowrap">{since}</div>}
-                      <div
-                        className={cn(
-                          'rounded-full border whitespace-nowrap',
-                          'px-2.5 py-1 text-[11px]', // ✅ 칩도 더 촘촘하게
-                          working
-                            ? 'border-emerald-300/30 bg-emerald-500/10 text-emerald-100'
-                            : 'border-white/12 bg-white/5 text-white/60'
-                        )}
-                      >
-                        {working ? '출근 중' : '대기/퇴근'}
-                      </div>
+                  <div className="shrink-0 flex items-center gap-2">
+                    {since && <div className="text-[11px] text-white/45 whitespace-nowrap">{since}</div>}
+                    <div
+                      className={cn(
+                        'rounded-full border whitespace-nowrap',
+                        'px-2.5 py-1 text-[11px]',
+                        working ? 'border-emerald-300/30 bg-emerald-500/10 text-emerald-100' : 'border-white/12 bg-white/5 text-white/60'
+                      )}
+                    >
+                      {working ? '출근 중' : '대기/퇴근'}
                     </div>
                   </div>
-                </button>
-              )
-            })}
-          </div>
-        </GlassCard>
-      )}
+                </div>
+              </button>
+            )
+          })}
 
-      {/* 플로팅 + 버튼 */}
+          {/* sentinel */}
+          <div ref={sentinelRef} className="h-8" />
+        </div>
+      </GlassCard>
+
+      {/* + 버튼 */}
       <button
         onClick={() => setOpen(true)}
         className={cn(
@@ -410,7 +402,7 @@ export default function AdminStaffPage() {
         <Plus className="h-6 w-6 mx-auto" />
       </button>
 
-      {/* 직원 추가 모달 */}
+      {/* 모달 */}
       {open && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-6">
           <button className="absolute inset-0 bg-black/60" onClick={() => setOpen(false)} type="button" aria-label="닫기" />
@@ -483,15 +475,28 @@ export default function AdminStaffPage() {
   )
 }
 
-/* -------------------------
-   시간 표시 유틸
-------------------------- */
+/* utils */
+function normalizeStaffRows(data: unknown): StaffRow[] {
+  const arr = Array.isArray(data) ? data : []
+  return arr
+    .map((r: any) => {
+      const row: StaffRow = {
+        id: String(r?.id ?? ''),
+        login_id: String(r?.login_id ?? ''),
+        nickname: String(r?.nickname ?? ''),
+        last_checkin_at: r?.last_checkin_at ?? null,
+        last_checkout_at: r?.last_checkout_at ?? null,
+      }
+      if (!row.id) return null
+      return row
+    })
+    .filter((x): x is StaffRow => Boolean(x))
+}
 
 function formatSince(iso: string, nowMs: number) {
   const t = new Date(iso).getTime()
   if (!Number.isFinite(t)) return ''
   const diffSec = Math.max(0, Math.floor((nowMs - t) / 1000))
-
   if (diffSec < 30) return '방금'
   const diffMin = Math.floor(diffSec / 60)
   if (diffMin < 60) return `${diffMin}분 전`
@@ -499,4 +504,35 @@ function formatSince(iso: string, nowMs: number) {
   if (diffHour < 24) return `${diffHour}시간 전`
   const diffDay = Math.floor(diffHour / 24)
   return `${diffDay}일 전`
+}
+
+function ssRead<T>(key: string, ttlMs: number): T | null {
+  try {
+    const raw = sessionStorage.getItem(key)
+    if (!raw) return null
+    const parsed = JSON.parse(raw)
+    const ts = Number(parsed?.ts ?? 0)
+    if (!ts || Date.now() - ts > ttlMs) return null
+    return parsed as T
+  } catch {
+    return null
+  }
+}
+
+function ssWrite(key: string, value: any) {
+  idle(() => {
+    try {
+      sessionStorage.setItem(key, JSON.stringify(value))
+    } catch {
+      // ignore
+    }
+  })
+}
+
+function idle(fn: () => void) {
+  if (typeof (window as any).requestIdleCallback === 'function') {
+    ;(window as any).requestIdleCallback(fn, { timeout: 800 })
+  } else {
+    window.setTimeout(fn, 0)
+  }
 }
