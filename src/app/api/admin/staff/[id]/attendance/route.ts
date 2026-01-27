@@ -1,13 +1,16 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
 type AttendanceStatus = 'working' | 'car_wait' | 'dorm_wait' | 'off'
-
 const ALLOWED: AttendanceStatus[] = ['working', 'car_wait', 'dorm_wait', 'off']
 
-export async function POST(req: Request, ctx: { params: { id: string } }) {
+export async function POST(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
   try {
-    const staffId = ctx.params.id
+    const { id: staffId } = await params
+
     const auth = req.headers.get('authorization') || ''
     const token = auth.startsWith('Bearer ') ? auth.slice(7) : ''
 
@@ -15,11 +18,19 @@ export async function POST(req: Request, ctx: { params: { id: string } }) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const supabaseAdmin = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!,
-      { auth: { persistSession: false } }
-    )
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+
+    if (!supabaseUrl || !serviceKey) {
+      return NextResponse.json(
+        { error: 'Missing SUPABASE env vars' },
+        { status: 500 }
+      )
+    }
+
+    const supabaseAdmin = createClient(supabaseUrl, serviceKey, {
+      auth: { persistSession: false },
+    })
 
     // 1) 토큰 유저 확인
     const { data: userData, error: userErr } = await supabaseAdmin.auth.getUser(token)
