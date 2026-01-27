@@ -1,17 +1,23 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { supabaseClient } from '@/lib/supabaseClient'
 import { GlassCard } from '@/components/ui/GlassCard'
 import { PageHeader } from '@/components/ui/PageHeader'
 import { ProButton } from '@/components/ui/ProButton'
 import { cn } from '@/lib/cn'
-import { Star, Save, Trash2, ChevronLeft, ChevronRight, X } from 'lucide-react'
+import { Star, Save, Trash2, ChevronLeft, ChevronRight, X, UserCheck } from 'lucide-react'
 
-/* -------------------------
-   types
-------------------------- */
+/* ------------------------- types ------------------------- */
+type StaffStatus = 'WORKING' | 'CAR_WAIT' | 'LODGE_WAIT' | 'OFF'
+
+const STAFF_STATUS_LABEL: Record<StaffStatus, string> = {
+  WORKING: '출근중',
+  CAR_WAIT: '차대기중',
+  LODGE_WAIT: '숙소대기중',
+  OFF: '퇴근',
+}
 
 type Staff = {
   id: string
@@ -24,16 +30,12 @@ type Staff = {
   bank_name: string | null
   bank_account: string | null
   bank_holder: string | null
+  // ✅ 신규: 근태 상태
+  work_status?: StaffStatus | null
 }
 
 type StoreRow = { id: number; name: string; is_active: boolean }
-
-type PaymentRow = {
-  amount: number | null
-  memo: string | null
-  method: string | null
-  paid_at: string | null
-}
+type PaymentRow = { amount: number | null; memo: string | null; method: string | null; paid_at: string | null }
 
 type MemoV1 = {
   v: 1
@@ -77,6 +79,35 @@ type MemoV2 = {
   storeTotal: number
 }
 
+type MemoV3 = {
+  v: 3
+  baseLabel: string
+  baseMinutes: number
+
+  // ✅ 합산 표기용(분/60). 0.5 단위. (J/룸 분리)
+  svcUnits: number // 전체(하위 호환)
+  jUnits?: number
+  rUnits?: number
+
+  // ✅ 중복 클릭 지원(카운트)
+  jCounts: Record<Exclude<JSvcKey, 'NONE'>, number>
+  rCounts: Record<Exclude<RSvcKey, 'NONE'>, number>
+  heartCount: number
+  atCount: number
+
+  staffBase: number
+  adminBase: number
+  staffAdd: number
+  adminAdd: number
+  tip: number
+  cash: boolean
+  misu: boolean
+  misuAmount: number
+  staffPay: number
+  adminPay: number
+  storeTotal: number
+}
+
 type WorkLogRow = {
   id: number
   work_at: string
@@ -84,20 +115,23 @@ type WorkLogRow = {
   option_heart: boolean
   option_at: boolean
   stores: { name: string } | null
-
-  // ✅ 파싱 비용 제거: normalize에서 1번만 만든다
   payment: PaymentRow | null
-  memoObj: MemoV1 | MemoV2 | null
+  memoObj: MemoV1 | MemoV2 | MemoV3 | null
 }
 
 type DerivedLog = {
   id: number
   work_at: string
   ts: number
-  timeText: string
+  timeText: string // 09:11
   storeName: string
   baseLabel: string
   minutes: number
+
+  // ✅ 합산 단위(J/룸 분리)
+  jUnits: number
+  rUnits: number
+
   storeTotal: number
   staffPay: number
   adminPay: number
@@ -105,14 +139,11 @@ type DerivedLog = {
   cash: boolean
   misu: boolean
   misuAmount: number
-  heart: boolean
-  at: boolean
+  heartCount: number
+  atCount: number
 }
 
-/* -------------------------
-   constants / rules
-------------------------- */
-
+/* ------------------------- constants / rules ------------------------- */
 const STAFF_TTL = 2 * 60 * 1000
 const LOGS_TTL = 30 * 1000
 const STORES_TTL = 10 * 60 * 1000
@@ -133,10 +164,13 @@ const R_SVC: Record<Exclude<RSvcKey, 'NONE'>, { label: string; minutes: number; 
 const ADDON_HEART = { label: '♡', store: 100000, staff: 90000, admin: 10000 }
 const ADDON_AT = { label: '@', store: 200000, staff: 180000, admin: 20000 }
 
-/* -------------------------
-   page
-------------------------- */
+const J_KEYS: Array<Exclude<JSvcKey, 'NONE'>> = ['J_HALF', 'J_ONE', 'J_ONE_HALF', 'J_TWO']
+const R_KEYS: Array<Exclude<RSvcKey, 'NONE'>> = ['RT_HALF', 'RT_ONE']
 
+const EMPTY_J_COUNTS: Record<Exclude<JSvcKey, 'NONE'>, number> = { J_HALF: 0, J_ONE: 0, J_ONE_HALF: 0, J_TWO: 0 }
+const EMPTY_R_COUNTS: Record<Exclude<RSvcKey, 'NONE'>, number> = { RT_HALF: 0, RT_ONE: 0 }
+
+/* ------------------------- page ------------------------- */
 export default function AdminStaffDetailPage() {
   const router = useRouter()
   const params = useParams<{ id: string }>()
@@ -163,15 +197,14 @@ export default function AdminStaffDetailPage() {
   const [storeDropdownOpen, setStoreDropdownOpen] = useState(false)
   const [workTime, setWorkTime] = useState(getTimeHHMM())
 
-  // 서비스/옵션/결제
-  const [jSvc, setJSvc] = useState<JSvcKey>('NONE')
-  const [rSvc, setRSvc] = useState<RSvcKey>('NONE')
-  const [optionHeart, setOptionHeart] = useState(false)
-  const [optionAt, setOptionAt] = useState(false)
+  // ✅ 서비스/옵션/결제 (중복 클릭: count)
+  const [jCounts, setJCounts] = useState<Record<Exclude<JSvcKey, 'NONE'>, number>>({ ...EMPTY_J_COUNTS })
+  const [rCounts, setRCounts] = useState<Record<Exclude<RSvcKey, 'NONE'>, number>>({ ...EMPTY_R_COUNTS })
+  const [heartCount, setHeartCount] = useState(0)
+  const [atCount, setAtCount] = useState(0)
 
   const [cash, setCash] = useState(false)
   const [misu, setMisu] = useState(false)
-
   const [tip, setTip] = useState<number>(0)
   const [misuAmount, setMisuAmount] = useState<number>(0)
   const [saving, setSaving] = useState(false)
@@ -196,6 +229,11 @@ export default function AdminStaffDetailPage() {
   const [settleError, setSettleError] = useState<string | null>(null)
   const [settleRows, setSettleRows] = useState<WorkLogRow[]>([])
 
+  // ✅ 근태 모달
+  const [attOpen, setAttOpen] = useState(false)
+  const [attSaving, setAttSaving] = useState(false)
+  const [attStatus, setAttStatus] = useState<StaffStatus>('OFF')
+
   // ✅ 현금/미수 동시에 ON 불가(요구사항)
   const toggleCash = () => {
     setCash((prev) => {
@@ -212,33 +250,88 @@ export default function AdminStaffDetailPage() {
     })
   }
 
-  // ✅ 계산
+  // ✅ 카운트 증감 유틸
+  const incJ = (k: Exclude<JSvcKey, 'NONE'>) => setJCounts((p) => ({ ...p, [k]: (p[k] || 0) + 1 }))
+  const decJ = (k: Exclude<JSvcKey, 'NONE'>) => setJCounts((p) => ({ ...p, [k]: Math.max(0, (p[k] || 0) - 1) }))
+
+  const incR = (k: Exclude<RSvcKey, 'NONE'>) => setRCounts((p) => ({ ...p, [k]: (p[k] || 0) + 1 }))
+  const decR = (k: Exclude<RSvcKey, 'NONE'>) => setRCounts((p) => ({ ...p, [k]: Math.max(0, (p[k] || 0) - 1) }))
+
+  const incHeart = () => setHeartCount((v) => v + 1)
+  const decHeart = () => setHeartCount((v) => Math.max(0, v - 1))
+  const incAt = () => setAtCount((v) => v + 1)
+  const decAt = () => setAtCount((v) => Math.max(0, v - 1))
+
+  // ✅ 계산 (J/룸 분리 합산)
   const calc = useMemo(() => {
-    const j = jSvc !== 'NONE' ? J_SVC[jSvc] : null
-    const r = rSvc !== 'NONE' ? R_SVC[rSvc] : null
+    let jMinutes = 0
+    let rMinutes = 0
 
-    const baseMinutes = (j?.minutes ?? 0) + (r?.minutes ?? 0)
-    const baseStore = (j?.store ?? 0) + (r?.store ?? 0)
-    const baseStaff = (j?.staff ?? 0) + (r?.staff ?? 0)
-    const baseAdmin = (j?.admin ?? 0) + (r?.admin ?? 0)
+    let baseStore = 0
+    let baseStaff = 0
+    let baseAdmin = 0
 
-    const addStaff = (optionHeart ? ADDON_HEART.staff : 0) + (optionAt ? ADDON_AT.staff : 0)
-    const addAdmin = (optionHeart ? ADDON_HEART.admin : 0) + (optionAt ? ADDON_AT.admin : 0)
-    const addStore = (optionHeart ? ADDON_HEART.store : 0) + (optionAt ? ADDON_AT.store : 0)
+    for (const k of J_KEYS) {
+      const c = Math.max(0, Number(jCounts[k] || 0))
+      if (c <= 0) continue
+      const svc = J_SVC[k]
+      jMinutes += svc.minutes * c
+      baseStore += svc.store * c
+      baseStaff += svc.staff * c
+      baseAdmin += svc.admin * c
+    }
 
+    for (const k of R_KEYS) {
+      const c = Math.max(0, Number(rCounts[k] || 0))
+      if (c <= 0) continue
+      const svc = R_SVC[k]
+      rMinutes += svc.minutes * c
+      baseStore += svc.store * c
+      baseStaff += svc.staff * c
+      baseAdmin += svc.admin * c
+    }
+
+    const baseMinutes = jMinutes + rMinutes
+
+    // addons
+    const hC = Math.max(0, Number(heartCount || 0))
+    const aC = Math.max(0, Number(atCount || 0))
+
+    const addStaff = hC * ADDON_HEART.staff + aC * ADDON_AT.staff
+    const addAdmin = hC * ADDON_HEART.admin + aC * ADDON_AT.admin
+    const addStore = hC * ADDON_HEART.store + aC * ADDON_AT.store
+
+    // money
     const safeTip = Math.max(0, Number(tip || 0))
     const safeMisuAmount = Math.max(0, Number(misuAmount || 0))
-
     const staffPay = baseStaff + addStaff + safeTip
     const adminPay = baseAdmin + addAdmin
     const storeTotal = baseStore + addStore
 
-    const labels = [j?.label, r?.label].filter(Boolean) as string[]
-    const baseLabel = labels.length ? labels.join(' + ') : '-'
+    // label (세부 내역용)
+    const parts: string[] = []
+    for (const k of J_KEYS) {
+      const c = Math.max(0, Number(jCounts[k] || 0))
+      if (c > 0) parts.push(`${J_SVC[k].label}×${c}`)
+    }
+    for (const k of R_KEYS) {
+      const c = Math.max(0, Number(rCounts[k] || 0))
+      if (c > 0) parts.push(`${R_SVC[k].label}×${c}`)
+    }
+    const baseLabel = parts.length ? parts.join(' + ') : '-'
+
+    // ✅ 합산 단위
+    const jUnits = jMinutes / 60
+    const rUnits = rMinutes / 60
+    const svcUnits = baseMinutes / 60 // 하위 호환
 
     return {
       baseLabel,
       minutes: baseMinutes,
+      svcUnits,
+      jUnits,
+      rUnits,
+
       staffBase: baseStaff,
       adminBase: baseAdmin,
       staffAdd: addStaff,
@@ -249,7 +342,16 @@ export default function AdminStaffDetailPage() {
       adminPay,
       storeTotal,
     }
-  }, [jSvc, rSvc, optionHeart, optionAt, tip, misuAmount])
+  }, [jCounts, rCounts, heartCount, atCount, tip, misuAmount])
+
+  // ✅ 정산요약 “요청 포맷”
+  const compactInputSummary = useMemo(() => {
+    const t = hhmmToKoText(workTime)
+    const n = buildSvcSummary(calc.jUnits, calc.rUnits) // ✅ J/룸 분리 합산 표기
+    const addons = `${repeatChar('♡', heartCount)}${repeatChar('@', atCount)}`
+    const misuMark = misu ? '■■' : ''
+    return `${t} ${n}${addons ? ` ${addons}` : ''}${misuMark ? ` ${misuMark}` : ''}`.trim()
+  }, [workTime, calc.jUnits, calc.rUnits, heartCount, atCount, misu])
 
   // 가게 검색
   const filteredStores = useMemo(() => {
@@ -282,23 +384,21 @@ export default function AdminStaffDetailPage() {
       })
   }, [stores, storeQuery])
 
-  /* -------------------------
-     FAST BOOTSTRAP (캐시 선렌더 + 백그라운드 최신화)
-  ------------------------- */
-
+  /* ------------------------- FAST BOOTSTRAP (캐시 선렌더 + 백그라운드 최신화) ------------------------- */
   useEffect(() => {
     let alive = true
     setError(null)
     setMessage(null)
 
     // 1) staff cache 먼저
-    const staffCacheKey = `pc_staff_${staffId}_v1`
+    const staffCacheKey = `pc_staff_${staffId}_v2`
     const cachedStaff = ssRead<{ ts: number; staff: Staff }>(staffCacheKey, STAFF_TTL)?.staff ?? null
     if (cachedStaff) {
       setStaff(cachedStaff)
       setBankName(cachedStaff.bank_name ?? '')
       setBankAccount(cachedStaff.bank_account ?? '')
       setBankHolder(cachedStaff.bank_holder ?? '')
+      setAttStatus((cachedStaff.work_status as StaffStatus) ?? 'OFF')
       setStaffLoading(false)
 
       const initYmd = cachedStaff.last_checkin_at ? toKstDateStringAt7(cachedStaff.last_checkin_at) : getKstDateString()
@@ -320,7 +420,8 @@ export default function AdminStaffDetailPage() {
       .finally(() => alive && setStoresLoading(false))
 
     // 3) logs cache(선택일 기준)
-    const preYmd = (cachedStaff?.last_checkin_at ? toKstDateStringAt7(cachedStaff.last_checkin_at) : getKstDateString()) || getKstDateString()
+    const preYmd =
+      (cachedStaff?.last_checkin_at ? toKstDateStringAt7(cachedStaff.last_checkin_at) : getKstDateString()) || getKstDateString()
     const logsCacheKey = `pc_logs_${staffId}_${preYmd}_v2`
     const cachedLogs = ssRead<{ ts: number; rows: WorkLogRow[] }>(logsCacheKey, LOGS_TTL)?.rows ?? null
     if (cachedLogs) {
@@ -330,37 +431,34 @@ export default function AdminStaffDetailPage() {
       setLogsLoading(true)
     }
 
-    // 4) 백그라운드 최신화(핵심: 웹에서 체감 딜레이 제거)
+    // 4) 백그라운드 최신화
     ;(async () => {
       try {
         const { data: session } = await supabaseClient.auth.getSession()
         const token = session.session?.access_token
         if (!token) throw new Error('세션이 없습니다. 다시 로그인 해주세요.')
 
-        // staff는 기존 API 사용(보안 유지)
         const res = await fetch(`/api/admin/staff/${staffId}`, { headers: { Authorization: `Bearer ${token}` } })
         const json = await res.json().catch(() => ({}))
         if (!res.ok) throw new Error(json?.error || 'staff 조회 실패')
-        const freshStaff = json.staff as Staff
 
+        const freshStaff = json.staff as Staff
         if (!alive) return
         setStaff(freshStaff)
         setBankName(freshStaff.bank_name ?? '')
         setBankAccount(freshStaff.bank_account ?? '')
         setBankHolder(freshStaff.bank_holder ?? '')
+        setAttStatus((freshStaff.work_status as StaffStatus) ?? 'OFF')
         setStaffLoading(false)
         ssWrite(staffCacheKey, { ts: Date.now(), staff: freshStaff })
 
         const initYmd = freshStaff.last_checkin_at ? toKstDateStringAt7(freshStaff.last_checkin_at) : getKstDateString()
-
-        // selectedYmd가 달라지면 먼저 세팅
         if (alive) {
           setSelectedYmd(initYmd)
           setSettleStartYmd(initYmd)
           setSettleEndYmd(initYmd)
         }
 
-        // logs 최신화
         const rows = await queryWorkLogs(staffId, initYmd)
         if (!alive) return
         setWorkLogs(rows)
@@ -427,10 +525,7 @@ export default function AdminStaffDetailPage() {
     return () => window.clearInterval(id)
   }, [selectedYmd])
 
-  /* -------------------------
-     actions
-  ------------------------- */
-
+  /* ------------------------- actions ------------------------- */
   const onPickStore = (s: StoreRow) => {
     setSelectedStoreId(s.id)
     setStoreQuery(s.name)
@@ -438,16 +533,14 @@ export default function AdminStaffDetailPage() {
   }
 
   const moveDay = (delta: number) => setSelectedYmd((prev) => addDaysYmd(prev, delta))
-
   const bumpTip = (delta: number) => setTip((t) => Math.max(0, Number(t || 0) + delta))
   const bumpMisu = (delta: number) => setMisuAmount((m) => Math.max(0, Number(m || 0) + delta))
-
   const resetTip = () => setTip(0)
   const resetMisuAmount = () => setMisuAmount(0)
 
   const resetServices = () => {
-    setJSvc('NONE')
-    setRSvc('NONE')
+    setJCounts({ ...EMPTY_J_COUNTS })
+    setRCounts({ ...EMPTY_R_COUNTS })
   }
 
   const resetAll = () => {
@@ -458,8 +551,8 @@ export default function AdminStaffDetailPage() {
     setStoreDropdownOpen(false)
     setWorkTime(getTimeHHMM())
     resetServices()
-    setOptionHeart(false)
-    setOptionAt(false)
+    setHeartCount(0)
+    setAtCount(0)
     setCash(false)
     setMisu(false)
     setTip(0)
@@ -472,8 +565,7 @@ export default function AdminStaffDetailPage() {
 
     if (!selectedStoreId) return setError('가게를 선택하세요.')
     if (!workTime) return setError('시작 시각을 선택하세요.')
-    if (jSvc === 'NONE' && rSvc === 'NONE') return setError('1열(J) 또는 2열(룸)에서 최소 1개는 선택하세요.')
-    if (!calc.minutes || calc.minutes <= 0) return setError('근무 시간이 0분입니다.')
+    if (!calc.minutes || calc.minutes <= 0) return setError('서비스(반개/1개/룸 등)를 최소 1번 이상 눌러주세요.')
 
     setSaving(true)
     try {
@@ -487,8 +579,9 @@ export default function AdminStaffDetailPage() {
           store_id: selectedStoreId,
           work_at: workAtIso,
           minutes: calc.minutes,
-          option_heart: optionHeart,
-          option_at: optionAt,
+          // ✅ 테이블 컬럼은 boolean 유지(호환) / 실제 카운트는 memo에 저장
+          option_heart: heartCount > 0,
+          option_at: atCount > 0,
         })
         .select('id')
         .single()
@@ -497,12 +590,20 @@ export default function AdminStaffDetailPage() {
       const workLogId = Number(wData?.id)
       if (!workLogId) throw new Error('workLogId missing')
 
-      const memoObj: MemoV2 = {
-        v: 2,
-        jSvc: jSvc === 'NONE' ? null : (jSvc as Exclude<JSvcKey, 'NONE'>),
-        rSvc: rSvc === 'NONE' ? null : (rSvc as Exclude<RSvcKey, 'NONE'>),
+      const memoObj: MemoV3 = {
+        v: 3,
         baseLabel: calc.baseLabel,
         baseMinutes: calc.minutes,
+
+        svcUnits: calc.svcUnits,
+        jUnits: calc.jUnits,
+        rUnits: calc.rUnits,
+
+        jCounts: { ...jCounts },
+        rCounts: { ...rCounts },
+        heartCount: Math.max(0, Number(heartCount || 0)),
+        atCount: Math.max(0, Number(atCount || 0)),
+
         staffBase: calc.staffBase,
         adminBase: calc.adminBase,
         staffAdd: calc.staffAdd,
@@ -511,8 +612,6 @@ export default function AdminStaffDetailPage() {
         cash,
         misu,
         misuAmount: calc.misuAmount,
-        heart: optionHeart,
-        at: optionAt,
         staffPay: calc.staffPay,
         adminPay: calc.adminPay,
         storeTotal: calc.storeTotal,
@@ -537,13 +636,13 @@ export default function AdminStaffDetailPage() {
       setLogsLoading(false)
       ssWrite(`pc_logs_${staffId}_${selectedYmd}_v2`, { ts: Date.now(), rows })
 
-      // 저장 후 reset(요구사항 유지)
+      // 저장 후 reset(기존 정책: 팁/미수/옵션성만 리셋)
       setTip(0)
       setMisuAmount(0)
       setCash(false)
       setMisu(false)
-      setOptionHeart(false)
-      setOptionAt(false)
+      setHeartCount(0)
+      setAtCount(0)
     } catch (e: any) {
       setError(e?.message ?? '저장 오류')
     } finally {
@@ -566,7 +665,6 @@ export default function AdminStaffDetailPage() {
 
     try {
       await supabaseClient.from('staff_payment_logs').delete().eq('work_log_id', logId)
-
       const { data: deletedRows, error: dErr } = await supabaseClient.from('staff_work_logs').delete().eq('id', logId).select('id')
       if (dErr) throw new Error(`삭제 실패: ${dErr.message}`)
       if (!deletedRows || deletedRows.length === 0) throw new Error('삭제 권한이 없거나, 이미 삭제된 항목입니다(RLS 가능성).')
@@ -616,7 +714,15 @@ export default function AdminStaffDetailPage() {
       )
 
       // staff cache도 갱신
-      ssWrite(`pc_staff_${staffId}_v1`, { ts: Date.now(), staff: { ...(staff as Staff), bank_name: bankName.trim() || null, bank_account: bankAccount.trim() || null, bank_holder: bankHolder.trim() || null } })
+      ssWrite(`pc_staff_${staffId}_v2`, {
+        ts: Date.now(),
+        staff: {
+          ...(staff as Staff),
+          bank_name: bankName.trim() || null,
+          bank_account: bankAccount.trim() || null,
+          bank_holder: bankHolder.trim() || null,
+        },
+      })
 
       setMessage('저장되었습니다.')
       setBankOpen(false)
@@ -627,21 +733,43 @@ export default function AdminStaffDetailPage() {
     }
   }
 
+  // ✅ 근태 저장
+  const onSaveAttendance = async () => {
+    setError(null)
+    setMessage(null)
+    setAttSaving(true)
+
+    try {
+      const { error } = await supabaseClient.from('user_profiles').update({ work_status: attStatus }).eq('id', staffId)
+      if (error) throw new Error(`근태 저장 실패: ${error.message}`)
+
+      setStaff((prev) => (prev ? { ...prev, work_status: attStatus } : prev))
+
+      ssWrite(`pc_staff_${staffId}_v2`, {
+        ts: Date.now(),
+        staff: { ...(staff as Staff), work_status: attStatus },
+      })
+
+      setMessage('근태가 저장되었습니다.')
+      setAttOpen(false)
+    } catch (e: any) {
+      setError(e?.message ?? '근태 저장 오류')
+    } finally {
+      setAttSaving(false)
+    }
+  }
+
   const onLogout = async () => {
     await supabaseClient.auth.signOut()
     router.replace('/login')
   }
 
-  /* -------------------------
-     view models (가벼움)
-  ------------------------- */
-
+  /* ------------------------- view models (가벼움) ------------------------- */
   const derivedLogs = useMemo(() => {
-    const list = workLogs
+    return workLogs
       .map((w) => deriveLog(w))
       .filter((x): x is DerivedLog => Boolean(x))
       .sort((a, b) => (a.ts !== b.ts ? a.ts - b.ts : a.storeName.localeCompare(b.storeName, 'ko')))
-    return list
   }, [workLogs])
 
   const totalStaffPay = useMemo(() => derivedLogs.reduce((sum, r) => sum + (r.staffPay || 0), 0), [derivedLogs])
@@ -665,7 +793,6 @@ export default function AdminStaffDetailPage() {
       arr.push(d)
       map.set(ymd, arr)
     }
-
     return Array.from(map.entries())
       .map(([ymd, items]) => {
         items.sort((a, b) => (a.ts !== b.ts ? a.ts - b.ts : a.storeName.localeCompare(b.storeName, 'ko')))
@@ -691,21 +818,16 @@ export default function AdminStaffDetailPage() {
     return { staffSum, adminSum, tipSum, misuSum, storeSum, minutesSum, count: settleDerived.length }
   }, [settleOpen, settleDerived])
 
-  /* -------------------------
-     settlement fetch (캐시)
-  ------------------------- */
-
+  /* ------------------------- settlement fetch (캐시) ------------------------- */
   const fetchSettlementRange = async (sid: string, startYmd: string, endYmd: string) => {
     const { startIso, endIso } = getKstRangeIso7(startYmd, endYmd)
     const cacheKey = `pc_settle_${sid}_${startYmd}_${endYmd}_v2`
-
     const cached = ssRead<{ ts: number; rows: WorkLogRow[] }>(cacheKey, SETTLE_TTL)?.rows ?? null
     if (cached) {
       setSettleRows(cached)
       return
     }
 
-    // pagination (많아도 안전)
     const pageSize = 1000
     let from = 0
     const all: any[] = []
@@ -713,13 +835,7 @@ export default function AdminStaffDetailPage() {
     while (true) {
       const { data, error } = await supabaseClient
         .from('staff_work_logs')
-        .select(
-          `
-          id, work_at, minutes, option_heart, option_at,
-          stores(name),
-          staff_payment_logs(amount, memo, method, paid_at)
-        `
-        )
+        .select('id, work_at, minutes, option_heart, option_at, stores(name), staff_payment_logs(amount, memo, method, paid_at)')
         .eq('staff_id', sid)
         .gte('work_at', startIso)
         .lt('work_at', endIso)
@@ -727,7 +843,6 @@ export default function AdminStaffDetailPage() {
         .range(from, from + pageSize - 1)
 
       if (error) throw new Error(`정산 내역 로드 실패: ${error.message}`)
-
       const chunk = Array.isArray(data) ? data : []
       all.push(...chunk)
       if (chunk.length < pageSize) break
@@ -753,18 +868,16 @@ export default function AdminStaffDetailPage() {
     }
   }
 
-  /* -------------------------
-     render (로딩이라도 화면은 바로 뜨게)
-  ------------------------- */
-
+  /* ------------------------- render ------------------------- */
   const titleName = staff?.nickname ?? '직원'
   const subId = staff?.login_id ?? ''
+  const statusText = STAFF_STATUS_LABEL[(staff?.work_status as StaffStatus) ?? attStatus ?? 'OFF']
 
   return (
     <div className="space-y-6">
       <PageHeader
         title={titleName}
-        subtitle={subId}
+        subtitle={`${subId}${statusText ? ` · ${statusText}` : ''}`}
         backHref="/admin/staff"
         right={
           <div className="flex items-center gap-2">
@@ -784,6 +897,24 @@ export default function AdminStaffDetailPage() {
               type="button"
             >
               정산
+            </button>
+
+            {/* ✅ 근태 버튼: 아이콘만 */}
+            <button
+              onClick={() => {
+                setAttStatus(((staff?.work_status as StaffStatus) ?? 'OFF') as StaffStatus)
+                setAttOpen(true)
+              }}
+              className={cn(
+                'inline-flex items-center justify-center',
+                'h-10 w-10 rounded-xl border border-white/12 bg-white/5',
+                'text-white/85 hover:bg-white/10 transition'
+              )}
+              type="button"
+              aria-label="근태"
+              title="근태"
+            >
+              <UserCheck className="h-5 w-5" />
             </button>
 
             <button
@@ -840,9 +971,13 @@ export default function AdminStaffDetailPage() {
                 placeholder={storesLoading ? '가게 목록 불러오는 중...' : '예: ㄱㄴ / ㅂㄴㄴ / 강남'}
                 autoComplete="off"
               />
-
               {!storesLoading && storeDropdownOpen && filteredStores.length > 0 && (
-                <div className={cn('absolute z-20 mt-2 w-full overflow-hidden rounded-2xl', 'border border-white/12 bg-zinc-950/95 backdrop-blur-xl shadow-2xl')}>
+                <div
+                  className={cn(
+                    'absolute z-20 mt-2 w-full overflow-hidden rounded-2xl',
+                    'border border-white/12 bg-zinc-950/95 backdrop-blur-xl shadow-2xl'
+                  )}
+                >
                   <div className="max-h-60 overflow-y-auto py-1">
                     {filteredStores.map((s) => (
                       <button
@@ -874,42 +1009,26 @@ export default function AdminStaffDetailPage() {
           </div>
         </div>
 
-        {/* 5x4 버튼 */}
+        {/* ✅ 5x4 버튼 */}
         <div className="mt-4">
           <div className="grid grid-cols-4 gap-2">
-            <GridButton active={jSvc === 'J_HALF'} onClick={() => setJSvc((p) => (p === 'J_HALF' ? 'NONE' : 'J_HALF'))}>
-              반개
-            </GridButton>
-            <GridButton active={rSvc === 'RT_HALF'} onClick={() => setRSvc((p) => (p === 'RT_HALF' ? 'NONE' : 'RT_HALF'))}>
-              룸반개
-            </GridButton>
+            <CountButton label="반개" count={jCounts.J_HALF} onInc={() => incJ('J_HALF')} onDec={() => decJ('J_HALF')} />
+            <CountButton label="룸반개" count={rCounts.RT_HALF} onInc={() => incR('RT_HALF')} onDec={() => decR('RT_HALF')} />
             <GridButton onClick={() => bumpTip(10000)}>팁 +10,000</GridButton>
             <GridButton onClick={() => bumpMisu(10000)}>미수 +10,000</GridButton>
 
-            <GridButton active={jSvc === 'J_ONE'} onClick={() => setJSvc((p) => (p === 'J_ONE' ? 'NONE' : 'J_ONE'))}>
-              1개
-            </GridButton>
-            <GridButton active={rSvc === 'RT_ONE'} onClick={() => setRSvc((p) => (p === 'RT_ONE' ? 'NONE' : 'RT_ONE'))}>
-              룸1개
-            </GridButton>
+            <CountButton label="1개" count={jCounts.J_ONE} onInc={() => incJ('J_ONE')} onDec={() => decJ('J_ONE')} />
+            <CountButton label="룸1개" count={rCounts.RT_ONE} onInc={() => incR('RT_ONE')} onDec={() => decR('RT_ONE')} />
             <GridButton onClick={() => bumpTip(50000)}>팁 +50,000</GridButton>
             <GridButton onClick={() => bumpMisu(50000)}>미수 +50,000</GridButton>
 
-            <GridButton active={jSvc === 'J_ONE_HALF'} onClick={() => setJSvc((p) => (p === 'J_ONE_HALF' ? 'NONE' : 'J_ONE_HALF'))}>
-              1개반
-            </GridButton>
-            <GridButton active={optionHeart} onClick={() => setOptionHeart((v) => !v)}>
-              ♡
-            </GridButton>
+            <CountButton label="1개반" count={jCounts.J_ONE_HALF} onInc={() => incJ('J_ONE_HALF')} onDec={() => decJ('J_ONE_HALF')} />
+            <CountButton label="♡" count={heartCount} onInc={incHeart} onDec={decHeart} />
             <GridButton onClick={() => bumpTip(100000)}>팁 +100,000</GridButton>
             <GridButton onClick={() => bumpMisu(100000)}>미수 +100,000</GridButton>
 
-            <GridButton active={jSvc === 'J_TWO'} onClick={() => setJSvc((p) => (p === 'J_TWO' ? 'NONE' : 'J_TWO'))}>
-              2개
-            </GridButton>
-            <GridButton active={optionAt} onClick={() => setOptionAt((v) => !v)}>
-              @
-            </GridButton>
+            <CountButton label="2개" count={jCounts.J_TWO} onInc={() => incJ('J_TWO')} onDec={() => decJ('J_TWO')} />
+            <CountButton label="@" count={atCount} onInc={incAt} onDec={decAt} />
             <GridButton onClick={resetTip}>팁초기화</GridButton>
             <GridButton onClick={resetMisuAmount}>미수초기화</GridButton>
 
@@ -920,17 +1039,29 @@ export default function AdminStaffDetailPage() {
               미수
             </GridButton>
 
-            <div aria-hidden="true" />
-            <GridButton onClick={resetAll}>초기화</GridButton>
+            {/* ✅ 서비스초기화 버튼 삭제 + 투명 자리 유지 */}
+            <div
+              className={cn(
+                'rounded-xl border px-3 py-2.5 text-sm font-semibold',
+                'border-transparent bg-transparent opacity-0 pointer-events-none select-none'
+              )}
+            >
+              서비스초기화
+            </div>
+
+            <GridButton onClick={resetAll}>전체초기화</GridButton>
           </div>
         </div>
 
-        {/* 정산요약 */}
+        {/* ✅ 정산요약 */}
         <div className="mt-4 rounded-2xl border border-white/10 bg-white/5 p-4">
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0">
               <div className="text-sm text-white/50">정산 요약</div>
-              <div className="mt-1 text-white font-semibold">
+
+              <div className="mt-1 text-white font-semibold">{compactInputSummary}</div>
+
+              <div className="mt-2 text-white font-semibold">
                 직원 {formatCurrency(calc.staffPay)}원 · 관리자 {formatCurrency(calc.adminPay)}원
               </div>
 
@@ -939,13 +1070,18 @@ export default function AdminStaffDetailPage() {
                   기본: {calc.baseLabel} {calc.minutes ? `(${calc.minutes}분)` : ''}
                 </div>
                 <div>
-                  옵션: {optionHeart ? '♡ ' : ''}
-                  {optionAt ? '@ ' : ''}
-                  {!optionHeart && !optionAt ? '-' : ''}
+                  옵션: {repeatChar('♡', heartCount)}
+                  {repeatChar('@', atCount)}
+                  {!heartCount && !atCount ? '-' : ''}
                 </div>
                 <div>팁: {formatCurrency(calc.tip)}원</div>
                 <div>미수금액: {formatCurrency(calc.misuAmount)}원</div>
-                {(cash || misu) && <div>상태: {cash ? '현금' : ''}{misu ? '미수' : ''}</div>}
+                {(cash || misu) && (
+                  <div>
+                    상태: {cash ? '현금' : ''}
+                    {misu ? '미수' : ''}
+                  </div>
+                )}
               </div>
             </div>
 
@@ -962,7 +1098,6 @@ export default function AdminStaffDetailPage() {
                   placeholder="0"
                 />
               </div>
-
               <div>
                 <div className="text-xs text-white/55">미수 직접입력</div>
                 <input
@@ -980,10 +1115,14 @@ export default function AdminStaffDetailPage() {
         </div>
 
         {message && (
-          <div className="mt-4 rounded-xl border border-emerald-300/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100">{message}</div>
+          <div className="mt-4 rounded-xl border border-emerald-300/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100">
+            {message}
+          </div>
         )}
         {error && (
-          <div className="mt-4 rounded-xl border border-red-400/30 bg-red-500/10 px-4 py-3 text-sm text-red-100">{error}</div>
+          <div className="mt-4 rounded-xl border border-red-400/30 bg-red-500/10 px-4 py-3 text-sm text-red-100">
+            {error}
+          </div>
         )}
 
         <div className="mt-4">
@@ -994,7 +1133,7 @@ export default function AdminStaffDetailPage() {
         </div>
       </GlassCard>
 
-      {/* 내역 카드 */}
+      {/* ✅ 내역 카드 */}
       <GlassCard className="p-5">
         <div className="flex items-end justify-between gap-3">
           <div>
@@ -1008,9 +1147,7 @@ export default function AdminStaffDetailPage() {
               >
                 <ChevronLeft className="h-4 w-4" />
               </button>
-
               <div className="text-sm text-white/80">{selectedYmd}</div>
-
               <button
                 type="button"
                 onClick={() => moveDay(+1)}
@@ -1030,50 +1167,51 @@ export default function AdminStaffDetailPage() {
 
         <div className="mt-4 divide-y divide-white/10">
           {logsLoading && <div className="py-6 text-sm text-white/60">내역 불러오는 중...</div>}
-
           {!logsLoading && derivedLogs.length === 0 && (
             <div className="py-6 text-sm text-white/60">해당 범위(07:00~다음날07:00)에 내역이 없습니다.</div>
           )}
 
           {!logsLoading &&
-            derivedLogs.map((d) => (
-              <div
-                key={d.id}
-                role="button"
-                tabIndex={0}
-                onClick={() => openDetail(d)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') openDetail(d)
-                }}
-                className={cn('py-3 px-2 rounded-xl cursor-pointer', 'hover:bg-white/5 transition', 'outline-none focus:ring-2 focus:ring-white/15')}
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <div className="text-white font-semibold truncate">
-                      {d.timeText} · {d.storeName}
+            derivedLogs.map((d) => {
+              const compact = buildCompactLineFromDerived(d)
+              return (
+                <div
+                  key={d.id}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => openDetail(d)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') openDetail(d)
+                  }}
+                  className={cn(
+                    'py-3 px-2 rounded-xl cursor-pointer',
+                    'hover:bg-white/5 transition',
+                    'outline-none focus:ring-2 focus:ring-white/15'
+                  )}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="text-white font-semibold truncate">
+                        {d.timeText} · {d.storeName}
+                      </div>
+                      <div className="mt-1 text-xs text-white/55 truncate">{compact}</div>
+                      <div className="mt-1 text-[11px] text-white/45">{d.baseLabel}</div>
                     </div>
-                    <div className="mt-1 text-xs text-white/55">
-                      {d.baseLabel}
-                      {d.heart ? ' · ♡' : ''}
-                      {d.at ? ' · @' : ''}
-                      {d.misu ? (d.misuAmount > 0 ? ` · 미수(${formatCurrency(d.misuAmount)}원)` : ' · 미수') : ''}
-                      {d.cash ? ' · 현금' : ''}
-                    </div>
-                  </div>
 
-                  <div className="shrink-0 text-right">
-                    <div className="text-sm text-white/85 font-semibold">
-                      {formatCurrency(d.staffPay)} / {formatCurrency(d.adminPay)}
+                    <div className="shrink-0 text-right">
+                      <div className="text-sm text-white/85 font-semibold">
+                        {formatCurrency(d.staffPay)} / {formatCurrency(d.adminPay)}
+                      </div>
+                      {d.tip > 0 && <div className="mt-1 text-[11px] text-white/45">팁 {formatCurrency(d.tip)}원</div>}
                     </div>
-                    {d.tip > 0 && <div className="mt-1 text-[11px] text-white/45">팁 {formatCurrency(d.tip)}원</div>}
                   </div>
                 </div>
-              </div>
-            ))}
+              )
+            })}
         </div>
       </GlassCard>
 
-      {/* 상세 팝업 */}
+      {/* ✅ 상세 팝업 */}
       {detailOpen && detail && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-6">
           <button
@@ -1092,7 +1230,7 @@ export default function AdminStaffDetailPage() {
                   <div className="text-white text-lg font-semibold truncate">
                     {detail.timeText} · {detail.storeName}
                   </div>
-                  <div className="mt-1 text-sm text-white/60">{detail.baseLabel}</div>
+                  <div className="mt-1 text-sm text-white/60">{buildCompactLineFromDerived(detail)}</div>
                 </div>
                 <button
                   onClick={() => {
@@ -1112,8 +1250,10 @@ export default function AdminStaffDetailPage() {
                 <RowKV k="관리자 정산" v={`${formatCurrency(detail.adminPay)}원`} />
                 {detail.tip > 0 && <RowKV k="팁" v={`${formatCurrency(detail.tip)}원`} />}
                 {detail.misu && detail.misuAmount > 0 && <RowKV k="미수금액" v={`${formatCurrency(detail.misuAmount)}원`} />}
-                <RowKV k="옵션" v={`${detail.heart ? '♡ ' : ''}${detail.at ? '@ ' : ''}`.trim() || '-'} />
-                {(detail.cash || detail.misu) && <RowKV k="상태" v={`${detail.cash ? '현금' : ''}${detail.misu ? '미수' : ''}`} />}
+                <RowKV k="옵션" v={`${repeatChar('♡', detail.heartCount)}${repeatChar('@', detail.atCount)}`.trim() || '-'} />
+                {(detail.cash || detail.misu) && (
+                  <RowKV k="상태" v={`${detail.cash ? '현금' : ''}${detail.misu ? '미수' : ''}`} />
+                )}
               </div>
 
               <div className="mt-5 flex gap-2">
@@ -1128,7 +1268,6 @@ export default function AdminStaffDetailPage() {
                 >
                   닫기
                 </ProButton>
-
                 <ProButton className="flex-1" type="button" onClick={() => onDelete(detail.id)} disabled={deleting}>
                   <Trash2 className="mr-2 h-4 w-4" />
                   {deleting ? '삭제 중...' : '삭제'}
@@ -1139,7 +1278,7 @@ export default function AdminStaffDetailPage() {
         </div>
       )}
 
-      {/* 정산 팝업 */}
+      {/* ✅ 정산 팝업 */}
       {settleOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-6">
           <button className="absolute inset-0 bg-black/60" onClick={() => setSettleOpen(false)} type="button" aria-label="닫기" />
@@ -1150,7 +1289,6 @@ export default function AdminStaffDetailPage() {
                   <div className="text-white text-lg font-semibold truncate">정산 · {staff?.nickname ?? ''}</div>
                   <div className="mt-1 text-sm text-white/55 truncate">기준 : 07:00 ~ 다음날 07:00</div>
                 </div>
-
                 <button
                   onClick={() => setSettleOpen(false)}
                   className="rounded-xl border border-white/12 bg-white/5 p-2 text-white/80 hover:bg-white/10 transition"
@@ -1218,7 +1356,6 @@ export default function AdminStaffDetailPage() {
                 >
                   최근 30일
                 </button>
-
                 <div className="flex-1" />
                 <ProButton type="button" onClick={runSettlementFetch} disabled={settleLoading}>
                   {settleLoading ? '조회 중...' : '조회'}
@@ -1226,7 +1363,9 @@ export default function AdminStaffDetailPage() {
               </div>
 
               {settleError && (
-                <div className="mt-4 rounded-xl border border-red-400/30 bg-red-500/10 px-4 py-3 text-sm text-red-100">{settleError}</div>
+                <div className="mt-4 rounded-xl border border-red-400/30 bg-red-500/10 px-4 py-3 text-sm text-red-100">
+                  {settleError}
+                </div>
               )}
 
               <div className="mt-5 rounded-2xl border border-white/10 bg-white/5 p-4">
@@ -1252,8 +1391,12 @@ export default function AdminStaffDetailPage() {
                       <div className="flex items-end justify-between gap-3">
                         <div className="text-white font-semibold">{day.ymd}</div>
                         <div className="text-xs text-white/60 text-right">
-                          <div>직원 {formatCurrency(day.staffSum)} · 관리자 {formatCurrency(day.adminSum)}</div>
-                          <div>팁 {formatCurrency(day.tipSum)} · 미수 {formatCurrency(day.misuSum)}</div>
+                          <div>
+                            직원 {formatCurrency(day.staffSum)} · 관리자 {formatCurrency(day.adminSum)}
+                          </div>
+                          <div>
+                            팁 {formatCurrency(day.tipSum)} · 미수 {formatCurrency(day.misuSum)}
+                          </div>
                         </div>
                       </div>
 
@@ -1265,13 +1408,9 @@ export default function AdminStaffDetailPage() {
                                 <div className="text-sm text-white font-semibold truncate">
                                   {d.timeText} · {d.storeName}
                                 </div>
-                                <div className="mt-1 text-xs text-white/55">
-                                  {d.baseLabel}
-                                  {d.heart ? ' · ♡' : ''}
-                                  {d.at ? ' · @' : ''}
-                                  {d.misu ? (d.misuAmount > 0 ? ` · 미수(${formatCurrency(d.misuAmount)}원)` : ' · 미수') : ''}
-                                  {d.cash ? ' · 현금' : ''}
-                                  {d.minutes ? ` · ${d.minutes}분` : ''}
+                                <div className="mt-1 text-xs text-white/55 truncate">{buildCompactLineFromDerived(d)}</div>
+                                <div className="mt-1 text-[11px] text-white/45">
+                                  {d.baseLabel} {d.minutes ? ` · ${d.minutes}분` : ''}
                                 </div>
                               </div>
 
@@ -1293,7 +1432,62 @@ export default function AdminStaffDetailPage() {
         </div>
       )}
 
-      {/* 계좌 모달 */}
+      {/* ✅ 근태 모달 */}
+      {attOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-6">
+          <button className="absolute inset-0 bg-black/60" onClick={() => setAttOpen(false)} aria-label="닫기" />
+          <div className="relative w-full max-w-md">
+            <GlassCard className="p-6">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="text-white text-lg font-semibold">근태 설정</div>
+                  <div className="mt-1 text-sm text-white/55 truncate">
+                    {staff?.nickname ?? ''} · 현재:{' '}
+                    {STAFF_STATUS_LABEL[((staff?.work_status as StaffStatus) ?? 'OFF') as StaffStatus]}
+                  </div>
+                </div>
+                <button
+                  onClick={() => setAttOpen(false)}
+                  className="rounded-xl border border-white/12 bg-white/5 p-2 text-white/80 hover:bg-white/10 transition"
+                  type="button"
+                  aria-label="닫기"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+
+              <div className="mt-5 grid grid-cols-2 gap-2">
+                {(['WORKING', 'CAR_WAIT', 'LODGE_WAIT', 'OFF'] as StaffStatus[]).map((s) => (
+                  <button
+                    key={s}
+                    type="button"
+                    onClick={() => setAttStatus(s)}
+                    className={cn(
+                      'rounded-xl border px-3 py-3 text-sm font-semibold transition',
+                      attStatus === s
+                        ? 'bg-white text-zinc-900 border-white/0'
+                        : 'bg-white/5 text-white/85 border-white/12 hover:bg-white/10'
+                    )}
+                  >
+                    {STAFF_STATUS_LABEL[s]}
+                  </button>
+                ))}
+              </div>
+
+              <div className="mt-5 flex gap-2">
+                <ProButton variant="ghost" className="flex-1" type="button" onClick={() => setAttOpen(false)} disabled={attSaving}>
+                  닫기
+                </ProButton>
+                <ProButton className="flex-1" type="button" onClick={onSaveAttendance} disabled={attSaving}>
+                  {attSaving ? '저장 중...' : '저장'}
+                </ProButton>
+              </div>
+            </GlassCard>
+          </div>
+        </div>
+      )}
+
+      {/* ✅ 계좌 모달 */}
       {bankOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-6">
           <button className="absolute inset-0 bg-black/60" onClick={() => setBankOpen(false)} aria-label="닫기" />
@@ -1313,7 +1507,6 @@ export default function AdminStaffDetailPage() {
                     autoComplete="off"
                   />
                 </div>
-
                 <div>
                   <label className="text-sm font-medium text-white/80">계좌번호</label>
                   <input
@@ -1324,7 +1517,6 @@ export default function AdminStaffDetailPage() {
                     autoComplete="off"
                   />
                 </div>
-
                 <div>
                   <label className="text-sm font-medium text-white/80">예금주</label>
                   <input
@@ -1353,11 +1545,16 @@ export default function AdminStaffDetailPage() {
   )
 }
 
-/* -------------------------
-   UI helpers
-------------------------- */
-
-function GridButton({ active, onClick, children }: { active?: boolean; onClick: () => void; children: React.ReactNode }) {
+/* ------------------------- UI helpers ------------------------- */
+function GridButton({
+  active,
+  onClick,
+  children,
+}: {
+  active?: boolean
+  onClick: () => void
+  children: ReactNode
+}) {
   return (
     <button
       onClick={onClick}
@@ -1372,6 +1569,40 @@ function GridButton({ active, onClick, children }: { active?: boolean; onClick: 
   )
 }
 
+function CountButton({
+  label,
+  count,
+  onInc,
+  onDec,
+}: {
+  label: string
+  count: number
+  onInc: () => void
+  onDec: () => void
+}) {
+  return (
+    <button
+      onClick={onInc}
+      onContextMenu={(e) => {
+        e.preventDefault()
+        onDec()
+      }}
+      className={cn(
+        'relative rounded-xl border px-3 py-2.5 text-sm font-semibold transition',
+        count > 0 ? 'bg-white text-zinc-900 border-white/0' : 'bg-white/5 text-white/85 border-white/12 hover:bg-white/10'
+      )}
+      type="button"
+    >
+      {label}
+      {count > 0 && (
+        <span className="absolute -top-2 -right-2 min-w-[22px] h-[22px] px-1 rounded-full bg-black/70 border border-white/15 text-white text-[11px] flex items-center justify-center">
+          {count}
+        </span>
+      )}
+    </button>
+  )
+}
+
 function RowKV({ k, v }: { k: string; v: string }) {
   return (
     <div className="flex items-center justify-between gap-3">
@@ -1381,22 +1612,12 @@ function RowKV({ k, v }: { k: string; v: string }) {
   )
 }
 
-/* -------------------------
-   data fetch (최적화 핵심)
-------------------------- */
-
+/* ------------------------- data fetch (최적화 핵심) ------------------------- */
 async function queryWorkLogs(staffId: string, ymd: string): Promise<WorkLogRow[]> {
   const { startIso, endIso } = getKstDayRangeIso7(ymd)
-
   const { data, error } = await supabaseClient
     .from('staff_work_logs')
-    .select(
-      `
-      id, work_at, minutes, option_heart, option_at,
-      stores(name),
-      staff_payment_logs(amount, memo, method, paid_at)
-    `
-    )
+    .select('id, work_at, minutes, option_heart, option_at, stores(name), staff_payment_logs(amount, memo, method, paid_at)')
     .eq('staff_id', staffId)
     .gte('work_at', startIso)
     .lt('work_at', endIso)
@@ -1468,59 +1689,103 @@ function deriveLog(w: WorkLogRow): DerivedLog | null {
 
   const timeText = toKstTime(new Date(w.work_at))
   const storeName = w.stores?.name ?? '가게 미지정'
+
   const memo = w.memoObj
 
+  // v3 (중복 카운트 + 합산 표기)
+  if (memo && memo.v === 3) {
+    const m = memo as MemoV3
+
+    const jUnits = Number.isFinite(Number(m.jUnits)) ? Number(m.jUnits) : unitsFromCountsJ(m.jCounts)
+    const rUnits = Number.isFinite(Number(m.rUnits)) ? Number(m.rUnits) : unitsFromCountsR(m.rCounts)
+
+    return {
+      id: w.id,
+      work_at: w.work_at,
+      ts,
+      timeText,
+      storeName,
+      baseLabel: m.baseLabel,
+      minutes: Number(m.baseMinutes || w.minutes || 0),
+      jUnits,
+      rUnits,
+      storeTotal: Number(m.storeTotal || 0),
+      staffPay: Number(m.staffPay || 0),
+      adminPay: Number(m.adminPay || 0),
+      tip: Number(m.tip || 0),
+      cash: Boolean(m.cash),
+      misu: Boolean(m.misu),
+      misuAmount: Number(m.misuAmount || 0),
+      heartCount: Math.max(0, Number(m.heartCount || 0)),
+      atCount: Math.max(0, Number(m.atCount || 0)),
+    }
+  }
+
+  // v2 (과거 데이터: 분리 없음 → J로 처리)
   if (memo && memo.v === 2) {
+    const m = memo as MemoV2
+    const baseMinutes = Number(m.baseMinutes || w.minutes || 0)
     return {
       id: w.id,
       work_at: w.work_at,
       ts,
       timeText,
       storeName,
-      baseLabel: memo.baseLabel,
-      minutes: Number(memo.baseMinutes || w.minutes || 0),
-      storeTotal: Number(memo.storeTotal || 0),
-      staffPay: Number(memo.staffPay || 0),
-      adminPay: Number(memo.adminPay || 0),
-      tip: Number(memo.tip || 0),
-      cash: Boolean(memo.cash),
-      misu: Boolean(memo.misu),
-      misuAmount: Number(memo.misuAmount || 0),
-      heart: Boolean(memo.heart),
-      at: Boolean(memo.at),
+      baseLabel: m.baseLabel,
+      minutes: baseMinutes,
+      jUnits: baseMinutes / 60,
+      rUnits: 0,
+      storeTotal: Number(m.storeTotal || 0),
+      staffPay: Number(m.staffPay || 0),
+      adminPay: Number(m.adminPay || 0),
+      tip: Number(m.tip || 0),
+      cash: Boolean(m.cash),
+      misu: Boolean(m.misu),
+      misuAmount: Number(m.misuAmount || 0),
+      heartCount: m.heart ? 1 : 0,
+      atCount: m.at ? 1 : 0,
     }
   }
 
+  // v1 (과거 데이터: 분리 없음 → J로 처리)
   if (memo && memo.v === 1) {
+    const m = memo as MemoV1
+    const mins = Number(w.minutes || 0)
     return {
       id: w.id,
       work_at: w.work_at,
       ts,
       timeText,
       storeName,
-      baseLabel: memo.baseLabel,
-      minutes: Number(w.minutes || 0),
-      storeTotal: Number((memo as MemoV1).storeTotal || 0),
-      staffPay: Number(memo.staffPay || 0),
-      adminPay: Number(memo.adminPay || 0),
-      tip: Number(memo.tip || 0),
-      cash: Boolean(memo.cash),
-      misu: Boolean(memo.misu),
+      baseLabel: m.baseLabel,
+      minutes: mins,
+      jUnits: mins / 60,
+      rUnits: 0,
+      storeTotal: Number(m.storeTotal || 0),
+      staffPay: Number(m.staffPay || 0),
+      adminPay: Number(m.adminPay || 0),
+      tip: Number(m.tip || 0),
+      cash: Boolean(m.cash),
+      misu: Boolean(m.misu),
       misuAmount: 0,
-      heart: Boolean(memo.heart),
-      at: Boolean(memo.at),
+      heartCount: m.heart ? 1 : 0,
+      atCount: m.at ? 1 : 0,
     }
   }
 
+  // fallback
   const fallbackStaff = Math.max(0, Number(w.payment?.amount ?? 0))
+  const mins = Number(w.minutes || 0)
   return {
     id: w.id,
     work_at: w.work_at,
     ts,
     timeText,
     storeName,
-    baseLabel: `${w.minutes}분`,
-    minutes: Number(w.minutes || 0),
+    baseLabel: `${mins}분`,
+    minutes: mins,
+    jUnits: mins / 60,
+    rUnits: 0,
     storeTotal: 0,
     staffPay: fallbackStaff,
     adminPay: 0,
@@ -1528,16 +1793,17 @@ function deriveLog(w: WorkLogRow): DerivedLog | null {
     cash: false,
     misu: false,
     misuAmount: 0,
-    heart: Boolean(w.option_heart),
-    at: Boolean(w.option_at),
+    heartCount: Boolean(w.option_heart) ? 1 : 0,
+    atCount: Boolean(w.option_at) ? 1 : 0,
   }
 }
 
-function parseMemo(memo: string | null): MemoV1 | MemoV2 | null {
+function parseMemo(memo: string | null): MemoV1 | MemoV2 | MemoV3 | null {
   if (!memo) return null
   try {
     const obj = JSON.parse(memo)
     if (!obj || typeof obj !== 'object') return null
+    if (obj.v === 3) return obj as MemoV3
     if (obj.v === 2) return obj as MemoV2
     if (obj.v === 1) return obj as MemoV1
     return null
@@ -1546,10 +1812,64 @@ function parseMemo(memo: string | null): MemoV1 | MemoV2 | null {
   }
 }
 
-/* -------------------------
-   time/date utils
-------------------------- */
+/* ------------------------- compact line helpers ------------------------- */
+function buildCompactLineFromDerived(d: DerivedLog) {
+  const t = isoToKoTimeText(d.work_at)
+  const n = buildSvcSummary(d.jUnits, d.rUnits)
+  const addons = `${repeatChar('♡', d.heartCount)}${repeatChar('@', d.atCount)}`
+  const misuMark = d.misu ? '■■' : ''
+  return `${t} ${n}${addons ? ` ${addons}` : ''}${misuMark ? ` ${misuMark}` : ''}`.trim()
+}
 
+function repeatChar(ch: string, n: number) {
+  const k = Math.max(0, Number(n || 0))
+  if (k <= 0) return ''
+  return new Array(k).fill(ch).join('')
+}
+
+// ✅ 단위(0.5)를 “반개/1개/1개반/2개/4개 …”로 표시 (J/룸 분리)
+function formatUnits(units: number, prefix: '' | '룸') {
+  const u = Number.isFinite(units) ? units : 0
+  const rounded = Math.round(u * 2) / 2
+  if (rounded <= 0) return ''
+
+  const intPart = Math.floor(rounded)
+  const half = rounded - intPart >= 0.5
+
+  if (intPart === 0 && half) return prefix ? `${prefix}반개` : '반개'
+  if (!half) return prefix ? `${prefix}${intPart}개` : `${intPart}개`
+  if (intPart === 1) return prefix ? `${prefix}1개반` : '1개반'
+  return prefix ? `${prefix}${intPart}개반` : `${intPart}개반`
+}
+
+function buildSvcSummary(jUnits: number, rUnits: number) {
+  const j = formatUnits(jUnits, '')
+  const r = formatUnits(rUnits, '룸')
+  if (j && r) return `${j} + ${r}`
+  return j || r || '0개'
+}
+
+function unitsFromCountsJ(counts: Record<Exclude<JSvcKey, 'NONE'>, number>) {
+  let minutes = 0
+  for (const k of J_KEYS) {
+    const c = Math.max(0, Number(counts?.[k] || 0))
+    if (c <= 0) continue
+    minutes += J_SVC[k].minutes * c
+  }
+  return minutes / 60
+}
+
+function unitsFromCountsR(counts: Record<Exclude<RSvcKey, 'NONE'>, number>) {
+  let minutes = 0
+  for (const k of R_KEYS) {
+    const c = Math.max(0, Number(counts?.[k] || 0))
+    if (c <= 0) continue
+    minutes += R_SVC[k].minutes * c
+  }
+  return minutes / 60
+}
+
+/* ------------------------- time/date utils ------------------------- */
 function computeWorkAtIso7(args: { baseDayYmd: string; timeHm: string }) {
   const inputMin = hhmmToMinutes(args.timeHm)
   const dayStartMin = 7 * 60
@@ -1580,6 +1900,20 @@ function getTimeHHMM() {
 
 function toKstTime(d: Date) {
   return d.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false })
+}
+
+function isoToKoTimeText(iso: string) {
+  const d = new Date(iso)
+  const h = d.getHours()
+  const m = d.getMinutes()
+  return `${h}시${String(m).padStart(2, '0')}분`
+}
+
+function hhmmToKoText(hm: string) {
+  if (!hm) return '-'
+  const [hh, mm] = hm.split(':').map((v) => Number(v))
+  if (!Number.isFinite(hh) || !Number.isFinite(mm)) return hm
+  return `${hh}시${String(mm).padStart(2, '0')}분`
 }
 
 function toKstDateStringAt7(iso: string) {
@@ -1631,10 +1965,7 @@ function getKstRangeIso7(startYmd: string, endYmd: string) {
   return { startIso: start.toISOString(), endIso: end.toISOString() }
 }
 
-/* -------------------------
-   cache utils
-------------------------- */
-
+/* ------------------------- cache utils ------------------------- */
 function ssRead<T>(key: string, ttlMs: number): T | null {
   try {
     const raw = sessionStorage.getItem(key)
@@ -1656,15 +1987,12 @@ function ssWrite(key: string, value: any) {
   }
 }
 
-/* -------------------------
-   초성검색
-------------------------- */
-
-const CHOSUNG = ['ㄱ', 'ㄲ', 'ㄴ', 'ㄷ', 'ㄸ', 'ㄹ', 'ㅁ', 'ㅂ', 'ㅃ', 'ㅅ', 'ㅆ', 'ㅇ', 'ㅈ', 'ㅉ', 'ㅊ', 'ㅋ', 'ㅌ', 'ㅍ', 'ㅎ']
+/* ------------------------- 초성검색 ------------------------- */
+const CHOSUNG = ['ㄱ', 'ㄲ', 'ㄴ', 'ㄷ', 'ㄸ', 'ㄹ', 'ㅁ', 'ㅂ', 'ㅃ', 'ㅅ', 'ㅆ', 'ㅇ', 'ㅈ', 'ㅉ', 'ㅊ', 'ㅋ', 'ㅌ', 'ㅍ', 'ㅎ'] as const
 
 function isChosungString(q: string) {
   if (!q) return false
-  for (const ch of q) if (!CHOSUNG.includes(ch)) return false
+  for (const ch of q) if (!(CHOSUNG as readonly string[]).includes(ch)) return false
   return true
 }
 
@@ -1681,5 +2009,5 @@ function getChosung(ch: string) {
   const code = ch.charCodeAt(0)
   if (code < 0xac00 || code > 0xd7a3) return null
   const index = Math.floor((code - 0xac00) / 588)
-  return CHOSUNG[index] ?? null
+  return (CHOSUNG as readonly string[])[index] ?? null
 }

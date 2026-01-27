@@ -53,9 +53,8 @@ export async function GET(
     // 1-7) 직원 프로필 조회
     const { data: staff, error: staffErr } = await admin
       .from('user_profiles')
-      .select(
-        'id, login_id, nickname, role, is_active, last_checkin_at, last_checkout_at, bank_name, bank_account, bank_holder'
-      )
+.select('id, login_id, nickname, role, is_active, last_checkin_at, last_checkout_at, bank_name, bank_account, bank_holder, attendance_status')
+
       .eq('id', staffId)
       .maybeSingle()
 

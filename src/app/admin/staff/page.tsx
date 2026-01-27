@@ -10,15 +10,34 @@ import { cn } from '@/lib/cn'
 import { AdminNotificationBell } from '@/components/AdminNotificationBell'
 import { Plus, X } from 'lucide-react'
 
+type StaffStatus = 'WORKING' | 'CAR_WAIT' | 'LODGE_WAIT' | 'OFF'
+type StaffGroup = 'ON' | 'OFF' // ON=출근(출근중+차대기중+숙소대기중), OFF=퇴근
+
+const STAFF_STATUS_LABEL: Record<StaffStatus, string> = {
+  WORKING: '출근중',
+  CAR_WAIT: '차대기중',
+  LODGE_WAIT: '숙소대기중',
+  OFF: '퇴근',
+}
+
+const GROUP_LABEL: Record<StaffGroup, string> = {
+  ON: '출근',
+  OFF: '퇴근',
+}
+
+const GROUP_ORDER: StaffGroup[] = ['ON', 'OFF']
+const groupRank = (g: StaffGroup) => GROUP_ORDER.indexOf(g)
+
 type StaffRow = {
   id: string
   login_id: string
   nickname: string
   last_checkin_at: string | null
   last_checkout_at: string | null
+  work_status: StaffStatus | null
 }
 
-type SortMode = 'visit' | 'working'
+type SortMode = 'visit' | 'status'
 
 const VISIT_KEY = 'pc_admin_staff_last_visit_v1'
 const STAFF_CACHE_KEY = 'pc_admin_staff_rows_v2'
@@ -88,15 +107,11 @@ export default function AdminStaffPage() {
         const uid = sess.session?.user?.id
         if (!uid) throw new Error('로그인 만료')
 
-        const profQ = supabaseClient
-          .from('user_profiles')
-          .select('role, is_active')
-          .eq('id', uid)
-          .maybeSingle()
+        const profQ = supabaseClient.from('user_profiles').select('role, is_active').eq('id', uid).maybeSingle()
 
         const staffQ = supabaseClient
           .from('user_profiles')
-          .select('id, login_id, nickname, last_checkin_at, last_checkout_at')
+          .select('id, login_id, nickname, last_checkin_at, last_checkout_at, work_status')
           .eq('role', 'staff')
           .eq('is_active', true)
 
@@ -115,7 +130,7 @@ export default function AdminStaffPage() {
         setRows(list)
         ssWrite(STAFF_CACHE_KEY, { ts: Date.now(), rows: list })
 
-        // 렌더카운트 리셋(직원 많아도 첫 진입 가볍게)
+        // 렌더카운트 리셋
         setRenderCount(PAGE_CHUNK)
       } catch (e: any) {
         if (!alive) return
@@ -131,45 +146,57 @@ export default function AdminStaffPage() {
     }
   }, [])
 
-  const isWorking = (r: StaffRow) => {
+  // (레거시) 체크인/체크아웃 기반 출근 여부 추정
+  const isWorkingLegacy = (r: StaffRow) => {
     if (!r.last_checkin_at) return false
     if (!r.last_checkout_at) return true
     return new Date(r.last_checkin_at) > new Date(r.last_checkout_at)
   }
 
+  const statusOf = (r: StaffRow): StaffStatus => {
+    const s = r.work_status as StaffStatus | null
+    if (s) return s
+    return isWorkingLegacy(r) ? 'WORKING' : 'OFF'
+  }
+
+  // ✅ 그룹(출근/퇴근) 매핑: OFF만 퇴근, 나머지는 출근
+  const groupOfStatus = (st: StaffStatus): StaffGroup => (st === 'OFF' ? 'OFF' : 'ON')
+  const groupOfRow = (r: StaffRow): StaffGroup => groupOfStatus(statusOf(r))
+
   const lastActivityMs = (r: StaffRow) => {
-    const working = isWorking(r)
+    const working = isWorkingLegacy(r)
     const baseIso = working ? r.last_checkin_at : r.last_checkout_at ?? r.last_checkin_at
     const t = baseIso ? new Date(baseIso).getTime() : 0
     return Number.isFinite(t) ? t : 0
   }
 
   const sinceText = (r: StaffRow) => {
-    const working = isWorking(r)
+    const working = isWorkingLegacy(r)
     const baseIso = working ? r.last_checkin_at : r.last_checkout_at ?? r.last_checkin_at
     if (!baseIso) return ''
     return formatSince(baseIso, nowTick)
   }
 
-  const sorted = useMemo(() => {
+  // ✅ 그룹(출근/퇴근) 우선 정렬 + 그룹 내부 정렬(변경순/상태순)
+  const ordered = useMemo(() => {
     const list = [...rows]
-    if (sortMode === 'working') {
-      list.sort((a, b) => {
-        const aw = isWorking(a) ? 0 : 1
-        const bw = isWorking(b) ? 0 : 1
-        if (aw !== bw) return aw - bw
+    list.sort((a, b) => {
+      const ag = groupOfRow(a)
+      const bg = groupOfRow(b)
+      const ar = groupRank(ag)
+      const br = groupRank(bg)
+      if (ar !== br) return ar - br
+
+      if (sortMode === 'visit') {
+        const av = Number(visitMap[a.id] ?? 0)
+        const bv = Number(visitMap[b.id] ?? 0)
+        if (av !== bv) return bv - av
+      } else {
         const at = lastActivityMs(a)
         const bt = lastActivityMs(b)
         if (at !== bt) return bt - at
-        return (a.nickname || '').localeCompare(b.nickname || '', 'ko')
-      })
-      return list
-    }
+      }
 
-    list.sort((a, b) => {
-      const av = Number(visitMap[a.id] ?? 0)
-      const bv = Number(visitMap[b.id] ?? 0)
-      if (av !== bv) return bv - av
       return (a.nickname || '').localeCompare(b.nickname || '', 'ko')
     })
     return list
@@ -183,29 +210,26 @@ export default function AdminStaffPage() {
     const io = new IntersectionObserver(
       (entries) => {
         const hit = entries.some((e) => e.isIntersecting)
-        if (hit) {
-          setRenderCount((c) => Math.min(sorted.length, c + PAGE_CHUNK))
-        }
+        if (hit) setRenderCount((c) => Math.min(ordered.length, c + PAGE_CHUNK))
       },
       { root: null, threshold: 0.1 }
     )
 
     io.observe(el)
     return () => io.disconnect()
-  }, [sorted.length])
+  }, [ordered.length])
 
   // 상위 일부 prefetch (렌더 안 막게 idle)
   useEffect(() => {
-    const top = sorted.slice(0, PREFETCH_TOP_N)
+    const top = ordered.slice(0, PREFETCH_TOP_N)
     const key = top.map((x) => x.id).join(',')
     if (!key || key === lastPrefetchKeyRef.current) return
     lastPrefetchKeyRef.current = key
 
     const run = () => top.forEach((s) => router.prefetch(`/admin/staff/${s.id}`))
     idle(run)
-  }, [router, sorted])
+  }, [router, ordered])
 
-  // 클릭 시 visitMap 저장은 idle로 (클릭 딜레이 제거)
   const markVisitedIdle = (staffId: string) => {
     const next = { ...visitMap, [staffId]: Date.now() }
     idle(() => {
@@ -253,7 +277,7 @@ export default function AdminStaffPage() {
       setSyncing(true)
       const { data, error } = await supabaseClient
         .from('user_profiles')
-        .select('id, login_id, nickname, last_checkin_at, last_checkout_at')
+        .select('id, login_id, nickname, last_checkin_at, last_checkout_at, work_status')
         .eq('role', 'staff')
         .eq('is_active', true)
       if (error) throw new Error(`staff 목록 조회 실패: ${error.message}`)
@@ -275,7 +299,24 @@ export default function AdminStaffPage() {
     router.replace('/login')
   }
 
-  const visible = sorted.slice(0, renderCount)
+  const visible = ordered.slice(0, renderCount)
+
+  // ✅ 그룹(출근/퇴근)으로 묶기
+  const grouped = useMemo(() => {
+    const map = new Map<StaffGroup, StaffRow[]>()
+    for (const g of GROUP_ORDER) map.set(g, [])
+    for (const r of visible) map.get(groupOfRow(r))!.push(r)
+    return map
+  }, [visible])
+
+  // ✅ 배지 스타일: 출근중/차대기중=초록, 숙소대기중=노랑, 퇴근=빨강
+  const badgeClassByStatus = (st: StaffStatus) => {
+    if (st === 'WORKING' || st === 'CAR_WAIT') return 'border-emerald-300/30 bg-emerald-500/10 text-emerald-100'
+    if (st === 'LODGE_WAIT') return 'border-amber-300/30 bg-amber-500/10 text-amber-100'
+    return 'border-red-400/30 bg-red-500/10 text-red-100'
+  }
+
+  const sectionTitleClass = (g: StaffGroup) => (g === 'ON' ? 'text-emerald-100' : 'text-red-100')
 
   return (
     <div className="space-y-6">
@@ -293,10 +334,11 @@ export default function AdminStaffPage() {
       />
 
       <div className="flex items-center gap-2">
-        <span className="rounded-xl border border-white/12 bg-white/10 px-4 py-2 text-sm text-white font-semibold">
-          직원 관리
-        </span>
-        <span className={cn('rounded-xl border border-white/12 bg-white/5 px-4 py-2 text-sm', 'text-white/50 cursor-not-allowed')} title="준비 중">
+        <span className="rounded-xl border border-white/12 bg-white/10 px-4 py-2 text-sm text-white font-semibold">직원 관리</span>
+        <span
+          className={cn('rounded-xl border border-white/12 bg-white/5 px-4 py-2 text-sm', 'text-white/50 cursor-not-allowed')}
+          title="준비 중"
+        >
           매출 관리
         </span>
 
@@ -319,67 +361,86 @@ export default function AdminStaffPage() {
               onClick={() => setSortMode('visit')}
               className={cn(
                 'rounded-lg px-3 py-1.5 text-sm border transition',
-                sortMode === 'visit' ? 'bg-white text-zinc-900 border-white/0' : 'bg-white/5 text-white/80 border-white/12 hover:bg-white/10'
+                sortMode === 'visit'
+                  ? 'bg-white text-zinc-900 border-white/0'
+                  : 'bg-white/5 text-white/80 border-white/12 hover:bg-white/10'
               )}
               type="button"
             >
               변경순
             </button>
             <button
-              onClick={() => setSortMode('working')}
+              onClick={() => setSortMode('status')}
               className={cn(
                 'rounded-lg px-3 py-1.5 text-sm border transition',
-                sortMode === 'working' ? 'bg-white text-zinc-900 border-white/0' : 'bg-white/5 text-white/80 border-white/12 hover:bg-white/10'
+                sortMode === 'status'
+                  ? 'bg-white text-zinc-900 border-white/0'
+                  : 'bg-white/5 text-white/80 border-white/12 hover:bg-white/10'
               )}
               type="button"
             >
-              출근순
+              상태순
             </button>
           </div>
         </div>
 
-        <div className="mt-3 divide-y divide-white/10">
+        <div className="mt-3">
           {visible.length === 0 && (
-            <div className="py-5 text-sm text-white/60">
-              {syncing ? '불러오는 중…' : '직원이 없습니다.'}
-            </div>
+            <div className="py-5 text-sm text-white/60">{syncing ? '불러오는 중…' : '직원이 없습니다.'}</div>
           )}
 
-          {visible.map((s) => {
-            const working = isWorking(s)
-            const since = sinceText(s)
-            return (
-              <button
-                key={s.id}
-                onClick={() => {
-                  // ✅ 클릭 즉시 라우팅(렌더 막는 작업은 idle)
-                  startTransition(() => router.push(`/admin/staff/${s.id}`))
-                  markVisitedIdle(s.id)
-                }}
-                className={cn('w-full text-left rounded-xl transition', 'px-2 py-2.5 hover:bg-white/5')}
-                type="button"
-                disabled={isPending}
-              >
-                <div className="flex items-center justify-between gap-3">
-                  <div className="min-w-0">
-                    <div className="text-white text-sm font-semibold truncate">{s.nickname}</div>
-                    <div className="mt-0.5 text-[11px] text-white/35 truncate">{s.login_id}</div>
-                  </div>
+          {GROUP_ORDER.map((g) => {
+            const arr = grouped.get(g) ?? []
+            if (arr.length === 0) return null
 
-                  <div className="shrink-0 flex items-center gap-2">
-                    {since && <div className="text-[11px] text-white/45 whitespace-nowrap">{since}</div>}
-                    <div
-                      className={cn(
-                        'rounded-full border whitespace-nowrap',
-                        'px-2.5 py-1 text-[11px]',
-                        working ? 'border-emerald-300/30 bg-emerald-500/10 text-emerald-100' : 'border-white/12 bg-white/5 text-white/60'
-                      )}
-                    >
-                      {working ? '출근 중' : '대기/퇴근'}
-                    </div>
-                  </div>
+            return (
+              <div key={g} className="mt-4 first:mt-0">
+                <div className="flex items-center justify-between">
+                  <div className={cn('text-sm font-semibold', sectionTitleClass(g))}>{GROUP_LABEL[g]}</div>
+                  <div className="text-xs text-white/40">{arr.length}명</div>
                 </div>
-              </button>
+
+                <div className="mt-2 divide-y divide-white/10 rounded-2xl border border-white/10 bg-black/10">
+                  {arr.map((s) => {
+                    const since = sinceText(s)
+                    const st = statusOf(s)
+
+                    return (
+                      <button
+                        key={s.id}
+                        onClick={() => {
+                          startTransition(() => router.push(`/admin/staff/${s.id}`))
+                          markVisitedIdle(s.id)
+                        }}
+                        className={cn('w-full text-left rounded-xl transition', 'px-3 py-3 hover:bg-white/5')}
+                        type="button"
+                        disabled={isPending}
+                      >
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="min-w-0">
+                            <div className="text-white text-sm font-semibold truncate">{s.nickname}</div>
+                            <div className="mt-0.5 text-[11px] text-white/35 truncate">{s.login_id}</div>
+                          </div>
+
+                          <div className="shrink-0 flex items-center gap-2">
+                            {since && <div className="text-[11px] text-white/45 whitespace-nowrap">{since}</div>}
+                            {/* ✅ 우측 동그란 배지: 출근중/차대기중/숙소대기중/퇴근 */}
+                            <div
+                              className={cn(
+                                'rounded-full border whitespace-nowrap',
+                                'px-2.5 py-1 text-[11px]',
+                                badgeClassByStatus(st)
+                              )}
+                            >
+                              {STAFF_STATUS_LABEL[st]}
+                            </div>
+                          </div>
+                        </div>
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
             )
           })}
 
@@ -486,6 +547,7 @@ function normalizeStaffRows(data: unknown): StaffRow[] {
         nickname: String(r?.nickname ?? ''),
         last_checkin_at: r?.last_checkin_at ?? null,
         last_checkout_at: r?.last_checkout_at ?? null,
+        work_status: (r?.work_status ?? null) as any,
       }
       if (!row.id) return null
       return row
