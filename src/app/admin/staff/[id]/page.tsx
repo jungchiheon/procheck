@@ -1053,63 +1053,52 @@ export default function AdminStaffDetailPage() {
           </div>
         </div>
 
-        {/* ✅ 정산요약 */}
+        {/* ✅ 정산요약 (레이아웃 재구성) */}
         <div className="mt-4 rounded-2xl border border-white/10 bg-white/5 p-4">
-          <div className="flex items-start justify-between gap-4">
-            <div className="min-w-0">
-              <div className="text-sm text-white/50">정산 요약</div>
+          {/* 1) 제목 한줄 */}
+          <div className="flex items-center justify-between gap-3">
+            <div className="text-sm text-white/50">정산 요약</div>
+          </div>
 
-              <div className="mt-1 text-white font-semibold">{compactInputSummary}</div>
+          {/* 2) xx시xx분 + x개 + ♡/@/■■ 한줄 */}
+          <div
+            className="mt-1 text-white font-semibold whitespace-nowrap overflow-hidden text-ellipsis"
+            title={compactInputSummary}
+          >
+            {compactInputSummary}
+          </div>
 
-              <div className="mt-2 text-white font-semibold">
-                직원 {formatCurrency(calc.staffPay)}원 · 관리자 {formatCurrency(calc.adminPay)}원
-              </div>
+          {/* 3) 직원/관리자 한줄 */}
+          <div className="mt-2 text-white font-semibold whitespace-nowrap">
+            직원 {formatCurrency(calc.staffPay)}원, 관리자 {formatCurrency(calc.adminPay)}원
+          </div>
 
-              <div className="mt-2 text-xs text-white/50 space-y-1">
-                <div>
-                  기본: {calc.baseLabel} {calc.minutes ? `(${calc.minutes}분)` : ''}
-                </div>
-                <div>
-                  옵션: {repeatChar('♡', heartCount)}
-                  {repeatChar('@', atCount)}
-                  {!heartCount && !atCount ? '-' : ''}
-                </div>
-                <div>팁: {formatCurrency(calc.tip)}원</div>
-                <div>미수금액: {formatCurrency(calc.misuAmount)}원</div>
-                {(cash || misu) && (
-                  <div>
-                    상태: {cash ? '현금' : ''}
-                    {misu ? '미수' : ''}
-                  </div>
-                )}
-              </div>
+          {/* 4) 팁/미수 직접입력: 한줄 아래로 + 나란히 */}
+          <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <div className="text-xs text-white/55">팁 직접입력</div>
+              <input
+                type="number"
+                inputMode="numeric"
+                min={0}
+                className="mt-2 w-full rounded-xl border border-white/12 bg-black/20 px-3 py-2 text-white outline-none placeholder:text-white/30 focus:border-white/25"
+                value={Number.isFinite(tip) ? tip : 0}
+                onChange={(e) => setTip(Math.max(0, Number(e.target.value || 0)))}
+                placeholder="0"
+              />
             </div>
 
-            <div className="shrink-0 w-[160px] space-y-3">
-              <div>
-                <div className="text-xs text-white/55">팁 직접입력</div>
-                <input
-                  type="number"
-                  inputMode="numeric"
-                  min={0}
-                  className="mt-2 w-full rounded-xl border border-white/12 bg-black/20 px-3 py-2 text-white outline-none placeholder:text-white/30 focus:border-white/25"
-                  value={Number.isFinite(tip) ? tip : 0}
-                  onChange={(e) => setTip(Math.max(0, Number(e.target.value || 0)))}
-                  placeholder="0"
-                />
-              </div>
-              <div>
-                <div className="text-xs text-white/55">미수 직접입력</div>
-                <input
-                  type="number"
-                  inputMode="numeric"
-                  min={0}
-                  className="mt-2 w-full rounded-xl border border-white/12 bg-black/20 px-3 py-2 text-white outline-none placeholder:text-white/30 focus:border-white/25"
-                  value={Number.isFinite(misuAmount) ? misuAmount : 0}
-                  onChange={(e) => setMisuAmount(Math.max(0, Number(e.target.value || 0)))}
-                  placeholder="0"
-                />
-              </div>
+            <div>
+              <div className="text-xs text-white/55">미수 직접입력</div>
+              <input
+                type="number"
+                inputMode="numeric"
+                min={0}
+                className="mt-2 w-full rounded-xl border border-white/12 bg-black/20 px-3 py-2 text-white outline-none placeholder:text-white/30 focus:border-white/25"
+                value={Number.isFinite(misuAmount) ? misuAmount : 0}
+                onChange={(e) => setMisuAmount(Math.max(0, Number(e.target.value || 0)))}
+                placeholder="0"
+              />
             </div>
           </div>
         </div>
@@ -1546,15 +1535,7 @@ export default function AdminStaffDetailPage() {
 }
 
 /* ------------------------- UI helpers ------------------------- */
-function GridButton({
-  active,
-  onClick,
-  children,
-}: {
-  active?: boolean
-  onClick: () => void
-  children: ReactNode
-}) {
+function GridButton({ active, onClick, children }: { active?: boolean; onClick: () => void; children: ReactNode }) {
   return (
     <button
       onClick={onClick}
@@ -1569,17 +1550,7 @@ function GridButton({
   )
 }
 
-function CountButton({
-  label,
-  count,
-  onInc,
-  onDec,
-}: {
-  label: string
-  count: number
-  onInc: () => void
-  onDec: () => void
-}) {
+function CountButton({ label, count, onInc, onDec }: { label: string; count: number; onInc: () => void; onDec: () => void }) {
   return (
     <button
       onClick={onInc}
