@@ -36,8 +36,30 @@ type Staff = {
 type StoreRow = { id: number; name: string; is_active: boolean }
 type PaymentRow = { amount: number | null; memo: string | null; method: string | null; paid_at: string | null }
 
-// ✅ 누가 저장했는지(관리자)
-type SavedBy = { id: string; login_id: string; nickname: string; at: string }
+type SavedBy = {
+  id: string
+  login_id: string
+  nickname: string
+  at: string
+}
+
+type JSvcKey = 'NONE' | 'J_HALF' | 'J_ONE' | 'J_ONE_HALF' | 'J_TWO'
+type RSvcKey = 'NONE' | 'RT_HALF' | 'RT_ONE'
+
+type ServiceItem =
+  | { kind: 'SERVICE'; svcKind: 'J'; key: Exclude<JSvcKey, 'NONE'> }
+  | { kind: 'SERVICE'; svcKind: 'R'; key: Exclude<RSvcKey, 'NONE'> }
+
+type AddonItem = { kind: 'ADDON'; addon: 'HEART' | 'AT' }
+
+type DraftItem = ServiceItem | AddonItem
+type SettleKind = 'CASH' | 'MISU'
+
+type Segment = {
+  kind: SettleKind
+  items: DraftItem[]
+  tip: number
+}
 
 type MemoV1 = {
   v: 1
@@ -55,11 +77,8 @@ type MemoV1 = {
   staffPay: number
   adminPay: number
   storeTotal: number
-  savedBy?: SavedBy | null // ✅
+  savedBy?: SavedBy | null
 }
-
-type JSvcKey = 'NONE' | 'J_HALF' | 'J_ONE' | 'J_ONE_HALF' | 'J_TWO'
-type RSvcKey = 'NONE' | 'RT_HALF' | 'RT_ONE'
 
 type MemoV2 = {
   v: 2
@@ -80,7 +99,7 @@ type MemoV2 = {
   staffPay: number
   adminPay: number
   storeTotal: number
-  savedBy?: SavedBy | null // ✅
+  savedBy?: SavedBy | null
 }
 
 type MemoV3 = {
@@ -105,10 +124,9 @@ type MemoV3 = {
   staffPay: number
   adminPay: number
   storeTotal: number
-  savedBy?: SavedBy | null // ✅
+  savedBy?: SavedBy | null
 }
 
-/** ✅ v4: 서비스 1건 단위 입력(순서 유지) + 마지막 1건에 미수(■■) 토글 */
 type StepJ = { kind: 'J'; key: Exclude<JSvcKey, 'NONE'>; heart: number; at: number; misu: boolean }
 type StepR = { kind: 'R'; key: Exclude<RSvcKey, 'NONE'>; heart: number; at: number; misu: boolean }
 type Step = StepJ | StepR
@@ -132,7 +150,29 @@ type MemoV4 = {
   staffPay: number
   adminPay: number
   storeTotal: number
-  savedBy?: SavedBy | null // ✅
+  savedBy?: SavedBy | null
+}
+
+type MemoV5 = {
+  v: 5
+  baseLabel: string
+  baseMinutes: number
+  svcUnits: number
+  jUnits: number
+  rUnits: number
+  segments: Segment[]
+  staffBase: number
+  adminBase: number
+  staffAdd: number
+  adminAdd: number
+  tip: number
+  cash: boolean
+  misu: boolean
+  misuAmount: number
+  staffPay: number
+  adminPay: number
+  storeTotal: number
+  savedBy?: SavedBy | null
 }
 
 type WorkLogRow = {
@@ -143,7 +183,7 @@ type WorkLogRow = {
   option_at: boolean
   stores: { name: string } | null
   payment: PaymentRow | null
-  memoObj: MemoV1 | MemoV2 | MemoV3 | MemoV4 | null
+  memoObj: MemoV1 | MemoV2 | MemoV3 | MemoV4 | MemoV5 | null
 }
 
 type DerivedLog = {
@@ -165,7 +205,31 @@ type DerivedLog = {
   misuAmount: number
   heartCount: number
   atCount: number
-  savedByName: string | null // ✅
+  savedByName: string | null
+  compactText: string | null
+}
+
+type CalcResult = {
+  jCounts: Record<Exclude<JSvcKey, 'NONE'>, number>
+  rCounts: Record<Exclude<RSvcKey, 'NONE'>, number>
+  heartCount: number
+  atCount: number
+  baseLabel: string
+  minutes: number
+  svcUnits: number
+  jUnits: number
+  rUnits: number
+  staffBase: number
+  adminBase: number
+  staffAdd: number
+  adminAdd: number
+  tip: number
+  misuAmount: number
+  staffPay: number
+  adminPay: number
+  storeTotal: number
+  hasCash: boolean
+  hasMisu: boolean
 }
 
 /* ------------------------- constants / rules ------------------------- */
@@ -201,7 +265,6 @@ export default function AdminStaffDetailPage() {
   const params = useParams<{ id: string }>()
   const staffId = params.id
 
-  // ✅ 현재 로그인한 관리자(저장 주체) 캐시
   const savedByRef = useRef<SavedBy | null>(null)
 
   const [staff, setStaff] = useState<Staff | null>(null)
@@ -223,13 +286,13 @@ export default function AdminStaffDetailPage() {
   const [storeDropdownOpen, setStoreDropdownOpen] = useState(false)
   const [workTime, setWorkTime] = useState(getTimeHHMM())
 
-  // ✅ v4 순서 입력
-  const [steps, setSteps] = useState<Step[]>([])
-  // ✅ (선택) 미수 직접입력(override). 0이면 steps로 자동 계산
-  const [misuOverride, setMisuOverride] = useState<number>(0)
-
-  const [cash, setCash] = useState(false)
+  // 현재 입력중인 묶음
+  const [draftItems, setDraftItems] = useState<DraftItem[]>([])
   const [tip, setTip] = useState<number>(0)
+
+  // 확정된 묶음들
+  const [segments, setSegments] = useState<Segment[]>([])
+
   const [saving, setSaving] = useState(false)
 
   // 계좌 모달
@@ -257,252 +320,36 @@ export default function AdminStaffDetailPage() {
   const [attSaving, setAttSaving] = useState(false)
   const [attStatus, setAttStatus] = useState<StaffStatus>('OFF')
 
-  // ✅ 현재 로그인한 관리자 프로필(닉네임) 선로딩
-  useEffect(() => {
-    let alive = true
-    ;(async () => {
-      try {
-        const { data: sess } = await supabaseClient.auth.getSession()
-        const uid = sess.session?.user?.id
-        if (!uid) return
-        const { data: prof } = await supabaseClient
-          .from('user_profiles')
-          .select('id, login_id, nickname, role, is_active')
-          .eq('id', uid)
-          .maybeSingle()
+  const draftCalc = useMemo(() => calcOneSegment(draftItems, tip, 'CASH'), [draftItems, tip])
 
-        if (!alive || !prof) return
-        savedByRef.current = {
-          id: uid,
-          login_id: String((prof as any)?.login_id ?? ''),
-          nickname: String((prof as any)?.nickname ?? ''),
-          at: new Date().toISOString(),
-        }
-      } catch {}
-    })()
-
-    return () => {
-      alive = false
-    }
-  }, [])
-
-  // ✅ 현금/미수 동시 ON 불가 유지
-  const toggleCash = () => {
-    setCash((prev) => {
-      const next = !prev
-      if (next) {
-        setMisuOverride(0)
-        setSteps((p) => p.map((s) => ({ ...s, misu: false })))
-      }
-      return next
-    })
-  }
-
-  // ✅ step 추가/감소(우클릭 감소)
-  const pushJ = (k: Exclude<JSvcKey, 'NONE'>) => {
-    setError(null)
-    setMessage(null)
-    setSteps((p) => [...p, { kind: 'J', key: k, heart: 0, at: 0, misu: false }])
-  }
-  const pushR = (k: Exclude<RSvcKey, 'NONE'>) => {
-    setError(null)
-    setMessage(null)
-    setSteps((p) => [...p, { kind: 'R', key: k, heart: 0, at: 0, misu: false }])
-  }
-
-  const removeLastMatch = (pred: (s: Step) => boolean) =>
-    setSteps((p) => {
-      for (let i = p.length - 1; i >= 0; i--) {
-        if (pred(p[i])) return [...p.slice(0, i), ...p.slice(i + 1)]
-      }
-      return p
-    })
-
-  const decJ = (k: Exclude<JSvcKey, 'NONE'>) => removeLastMatch((s) => s.kind === 'J' && s.key === k)
-  const decR = (k: Exclude<RSvcKey, 'NONE'>) => removeLastMatch((s) => s.kind === 'R' && s.key === k)
-
-  // ✅ 옵션은 "마지막 서비스 1건"에 붙임
-  const incHeart = () => {
-    setError(null)
-    setMessage(null)
-    if (steps.length === 0) return setError('먼저 서비스(반개/1개/룸 등)를 선택하세요.')
-    setSteps((p) => {
-      if (p.length === 0) return p
-      const next = [...p]
-      const last = next[next.length - 1]
-      next[next.length - 1] = { ...last, heart: Math.max(0, Number(last.heart || 0)) + 1 }
-      return next
-    })
-  }
-  const decHeart = () =>
-    setSteps((p) => {
-      for (let i = p.length - 1; i >= 0; i--) {
-        const h = Math.max(0, Number(p[i].heart || 0))
-        if (h > 0) {
-          const next = [...p]
-          next[i] = { ...next[i], heart: h - 1 }
-          return next
-        }
-      }
-      return p
-    })
-
-  const incAt = () => {
-    setError(null)
-    setMessage(null)
-    if (steps.length === 0) return setError('먼저 서비스(반개/1개/룸 등)를 선택하세요.')
-    setSteps((p) => {
-      if (p.length === 0) return p
-      const next = [...p]
-      const last = next[next.length - 1]
-      next[next.length - 1] = { ...last, at: Math.max(0, Number(last.at || 0)) + 1 }
-      return next
-    })
-  }
-  const decAt = () =>
-    setSteps((p) => {
-      for (let i = p.length - 1; i >= 0; i--) {
-        const a = Math.max(0, Number(p[i].at || 0))
-        if (a > 0) {
-          const next = [...p]
-          next[i] = { ...next[i], at: a - 1 }
-          return next
-        }
-      }
-      return p
-    })
-
-  // ✅ 미수(■■): 마지막 서비스 1건에만 토글, 동시에 1건만 미수 가능
-  const toggleMisuLast = () => {
-    setError(null)
-    setMessage(null)
-    if (steps.length === 0) return setError('먼저 서비스(반개/1개/룸 등)를 선택하세요.')
-    setSteps((p) => {
-      if (p.length === 0) return p
-      const lastIdx = p.length - 1
-      const turningOn = !p[lastIdx].misu
-      const next = p.map((s, i) => {
-        if (i === lastIdx) return { ...s, misu: turningOn }
-        return turningOn ? { ...s, misu: false } : { ...s, misu: false }
+  const totalCalc = useMemo(() => {
+    const allSegments = [...segments]
+    if (draftItems.length > 0 || tip > 0) {
+      allSegments.push({
+        kind: 'CASH',
+        items: cloneItems(draftItems),
+        tip: Math.max(0, Number(tip || 0)),
       })
-      return next
-    })
-    setCash(false)
-  }
-
-  // ✅ 계산(steps 기반) + 버튼 배지 count 제공
-  const calc = useMemo(() => {
-    const jCounts = { ...EMPTY_J_COUNTS }
-    const rCounts = { ...EMPTY_R_COUNTS }
-
-    let jMinutes = 0
-    let rMinutes = 0
-
-    let baseStore = 0
-    let baseStaff = 0
-    let baseAdmin = 0
-
-    let addStore = 0
-    let addStaff = 0
-    let addAdmin = 0
-
-    let heartCount = 0
-    let atCount = 0
-
-    let autoMisuAmount = 0
-
-    for (const s of steps) {
-      const h = Math.max(0, Number(s.heart || 0))
-      const a = Math.max(0, Number(s.at || 0))
-      heartCount += h
-      atCount += a
-
-      const stepAddStore = h * ADDON_HEART.store + a * ADDON_AT.store
-      const stepAddStaff = h * ADDON_HEART.staff + a * ADDON_AT.staff
-      const stepAddAdmin = h * ADDON_HEART.admin + a * ADDON_AT.admin
-
-      addStore += stepAddStore
-      addStaff += stepAddStaff
-      addAdmin += stepAddAdmin
-
-      if (s.kind === 'J') {
-        jCounts[s.key] = (jCounts[s.key] || 0) + 1
-        const svc = J_SVC[s.key]
-        jMinutes += svc.minutes
-        baseStore += svc.store
-        baseStaff += svc.staff
-        baseAdmin += svc.admin
-
-        if (s.misu) autoMisuAmount += svc.store + stepAddStore
-      } else {
-        rCounts[s.key] = (rCounts[s.key] || 0) + 1
-        const svc = R_SVC[s.key]
-        rMinutes += svc.minutes
-        baseStore += svc.store
-        baseStaff += svc.staff
-        baseAdmin += svc.admin
-
-        if (s.misu) autoMisuAmount += svc.store + stepAddStore
-      }
     }
+    return calcAllSegments(allSegments)
+  }, [segments, draftItems, tip])
 
-    const baseMinutes = jMinutes + rMinutes
-    const safeTip = Math.max(0, Number(tip || 0))
-
-    const staffPay = baseStaff + addStaff + safeTip
-    const adminPay = baseAdmin + addAdmin
-    const storeTotal = baseStore + addStore
-
-    const parts: string[] = []
-    for (const k of J_KEYS) {
-      const c = Math.max(0, Number(jCounts[k] || 0))
-      if (c > 0) parts.push(`${J_SVC[k].label}×${c}`)
-    }
-    for (const k of R_KEYS) {
-      const c = Math.max(0, Number(rCounts[k] || 0))
-      if (c > 0) parts.push(`${R_SVC[k].label}×${c}`)
-    }
-    const baseLabel = parts.length ? parts.join(' + ') : '-'
-
-    const jUnits = jMinutes / 60
-    const rUnits = rMinutes / 60
-    const svcUnits = baseMinutes / 60
-
-    const override = Math.max(0, Number(misuOverride || 0))
-    const misuAmount = override > 0 ? override : autoMisuAmount
-    const misuFlag = misuAmount > 0
-
-    return {
-      jCounts,
-      rCounts,
-      heartCount,
-      atCount,
-      baseLabel,
-      minutes: baseMinutes,
-      svcUnits,
-      jUnits,
-      rUnits,
-      staffBase: baseStaff,
-      adminBase: baseAdmin,
-      staffAdd: addStaff,
-      adminAdd: addAdmin,
-      tip: safeTip,
-      misuAmount,
-      staffPay,
-      adminPay,
-      storeTotal,
-      misuFlag,
-    }
-  }, [steps, tip, misuOverride])
-
-  // ✅ 입력 요약(순서대로: 서비스 + 옵션 + ■■)
   const compactInputSummary = useMemo(() => {
     const t = hhmmToKoText(workTime)
-    const body = steps.length ? steps.map(formatStepForInput).join(' + ') : '0개'
-    const hasStepMisu = steps.some((s) => s.misu)
-    const tailMisu = !hasStepMisu && calc.misuFlag ? '■■' : ''
-    return `${t} ${body}${tailMisu ? ` ${tailMisu}` : ''}`.trim()
-  }, [workTime, steps, calc.misuFlag])
+    const parts = segments.map(formatSegmentSummary)
+
+    if (draftItems.length > 0 || tip > 0) {
+      parts.push(
+        formatSegmentSummary({
+          kind: 'CASH',
+          items: cloneItems(draftItems),
+          tip: Math.max(0, Number(tip || 0)),
+        })
+      )
+    }
+
+    return `${t} ${parts.length ? parts.join(' ') : '0개'}`
+  }, [workTime, segments, draftItems, tip])
 
   // 가게 검색
   const filteredStores = useMemo(() => {
@@ -536,6 +383,31 @@ export default function AdminStaffDetailPage() {
   }, [stores, storeQuery])
 
   /* ------------------------- bootstrap ------------------------- */
+  useEffect(() => {
+    let alive = true
+    ;(async () => {
+      try {
+        const { data: sess } = await supabaseClient.auth.getSession()
+        const uid = sess.session?.user?.id
+        if (!uid) return
+
+        const { data: prof } = await supabaseClient.from('user_profiles').select('id, login_id, nickname').eq('id', uid).maybeSingle()
+        if (!alive || !prof) return
+
+        savedByRef.current = {
+          id: uid,
+          login_id: String((prof as any)?.login_id ?? ''),
+          nickname: String((prof as any)?.nickname ?? ''),
+          at: new Date().toISOString(),
+        }
+      } catch {}
+    })()
+
+    return () => {
+      alive = false
+    }
+  }, [])
+
   useEffect(() => {
     let alive = true
     setError(null)
@@ -679,7 +551,64 @@ export default function AdminStaffDetailPage() {
   const bumpTip = (delta: number) => setTip((t) => Math.max(0, Number(t || 0) + delta))
   const resetTip = () => setTip(0)
 
-  const resetServices = () => setSteps([])
+  const pushJ = (k: Exclude<JSvcKey, 'NONE'>) => {
+    setError(null)
+    setMessage(null)
+    setDraftItems((p) => [...p, { kind: 'SERVICE', svcKind: 'J', key: k }])
+  }
+
+  const pushR = (k: Exclude<RSvcKey, 'NONE'>) => {
+    setError(null)
+    setMessage(null)
+    setDraftItems((p) => [...p, { kind: 'SERVICE', svcKind: 'R', key: k }])
+  }
+
+  const pushHeart = () => {
+    setError(null)
+    setMessage(null)
+    setDraftItems((p) => [...p, { kind: 'ADDON', addon: 'HEART' }])
+  }
+
+  const pushAt = () => {
+    setError(null)
+    setMessage(null)
+    setDraftItems((p) => [...p, { kind: 'ADDON', addon: 'AT' }])
+  }
+
+  const removeLastMatch = (pred: (s: DraftItem) => boolean) =>
+    setDraftItems((p) => {
+      for (let i = p.length - 1; i >= 0; i--) {
+        if (pred(p[i])) return [...p.slice(0, i), ...p.slice(i + 1)]
+      }
+      return p
+    })
+
+  const decJ = (k: Exclude<JSvcKey, 'NONE'>) => removeLastMatch((s) => s.kind === 'SERVICE' && s.svcKind === 'J' && s.key === k)
+  const decR = (k: Exclude<RSvcKey, 'NONE'>) => removeLastMatch((s) => s.kind === 'SERVICE' && s.svcKind === 'R' && s.key === k)
+  const decHeart = () => removeLastMatch((s) => s.kind === 'ADDON' && s.addon === 'HEART')
+  const decAt = () => removeLastMatch((s) => s.kind === 'ADDON' && s.addon === 'AT')
+
+  const commitSegment = (kind: SettleKind) => {
+    setError(null)
+    setMessage(null)
+
+    if (draftItems.length === 0 && tip <= 0) {
+      return setError('먼저 항목이나 팁을 입력하세요.')
+    }
+
+    const nextSeg: Segment = {
+      kind,
+      items: cloneItems(draftItems),
+      tip: Math.max(0, Number(tip || 0)),
+    }
+
+    setSegments((prev) => [...prev, nextSeg])
+    setDraftItems([])
+    setTip(0)
+  }
+
+  const commitCash = () => commitSegment('CASH')
+  const commitMisu = () => commitSegment('MISU')
 
   const resetAll = () => {
     setMessage(null)
@@ -688,10 +617,9 @@ export default function AdminStaffDetailPage() {
     setSelectedStoreId('')
     setStoreDropdownOpen(false)
     setWorkTime(getTimeHHMM())
-    resetServices()
-    setCash(false)
+    setDraftItems([])
+    setSegments([])
     setTip(0)
-    setMisuOverride(0)
   }
 
   const onSave = async () => {
@@ -700,14 +628,30 @@ export default function AdminStaffDetailPage() {
 
     if (!selectedStoreId) return setError('가게를 선택하세요.')
     if (!workTime) return setError('시작 시각을 선택하세요.')
-    if (!calc.minutes || calc.minutes <= 0) return setError('서비스(반개/1개/룸 등)를 최소 1번 이상 눌러주세요.')
+
+    const finalSegments = [...segments]
+    if (draftItems.length > 0 || tip > 0) {
+      finalSegments.push({
+        kind: 'CASH',
+        items: cloneItems(draftItems),
+        tip: Math.max(0, Number(tip || 0)),
+      })
+    }
+
+    if (finalSegments.length === 0) {
+      return setError('저장할 항목이 없습니다.')
+    }
+
+    const finalCalc = calcAllSegments(finalSegments)
+    if (finalCalc.minutes <= 0 && finalCalc.heartCount <= 0 && finalCalc.atCount <= 0 && finalCalc.tip <= 0) {
+      return setError('저장할 항목이 없습니다.')
+    }
 
     setSaving(true)
     try {
       const workAtIso = computeWorkAtIso7({ baseDayYmd: selectedYmd, timeHm: workTime })
       const nowIso = new Date().toISOString()
 
-      // ✅ 저장한 관리자 정보 확보
       let savedBy = savedByRef.current
       if (!savedBy) {
         const { data: sess } = await supabaseClient.auth.getSession()
@@ -733,9 +677,9 @@ export default function AdminStaffDetailPage() {
           staff_id: staffId,
           store_id: selectedStoreId,
           work_at: workAtIso,
-          minutes: calc.minutes,
-          option_heart: calc.heartCount > 0,
-          option_at: calc.atCount > 0,
+          minutes: finalCalc.minutes,
+          option_heart: finalCalc.heartCount > 0,
+          option_at: finalCalc.atCount > 0,
         })
         .select('id')
         .single()
@@ -744,37 +688,34 @@ export default function AdminStaffDetailPage() {
       const workLogId = Number(wData?.id)
       if (!workLogId) throw new Error('workLogId missing')
 
-      const memoObj: MemoV4 = {
-        v: 4,
-        baseLabel: calc.baseLabel,
-        baseMinutes: calc.minutes,
-        svcUnits: calc.svcUnits,
-        jUnits: calc.jUnits,
-        rUnits: calc.rUnits,
-        steps: steps.map((s) => ({
-          ...s,
-          heart: Math.max(0, Number(s.heart || 0)),
-          at: Math.max(0, Number(s.at || 0)),
-          misu: Boolean(s.misu),
-        })),
-        staffBase: calc.staffBase,
-        adminBase: calc.adminBase,
-        staffAdd: calc.staffAdd,
-        adminAdd: calc.adminAdd,
-        tip: calc.tip,
-        cash,
-        misu: calc.misuFlag,
-        misuAmount: calc.misuAmount,
-        staffPay: calc.staffPay,
-        adminPay: calc.adminPay,
-        storeTotal: calc.storeTotal,
-        savedBy: savedBy ?? null, // ✅
+      const summaryText = finalSegments.map(formatSegmentSummary).join(' ')
+
+      const memoObj: MemoV5 = {
+        v: 5,
+        baseLabel: summaryText,
+        baseMinutes: finalCalc.minutes,
+        svcUnits: finalCalc.svcUnits,
+        jUnits: finalCalc.jUnits,
+        rUnits: finalCalc.rUnits,
+        segments: finalSegments,
+        staffBase: finalCalc.staffBase,
+        adminBase: finalCalc.adminBase,
+        staffAdd: finalCalc.staffAdd,
+        adminAdd: finalCalc.adminAdd,
+        tip: finalCalc.tip,
+        cash: finalCalc.hasCash,
+        misu: finalCalc.hasMisu,
+        misuAmount: finalCalc.misuAmount,
+        staffPay: finalCalc.staffPay,
+        adminPay: finalCalc.adminPay,
+        storeTotal: finalCalc.storeTotal,
+        savedBy: savedBy ?? null,
       }
 
       const { error: pErr } = await supabaseClient.from('staff_payment_logs').insert({
         staff_id: staffId,
         work_log_id: workLogId,
-        amount: calc.staffPay,
+        amount: finalCalc.staffPay,
         method: 'cash',
         paid_at: nowIso,
         memo: JSON.stringify(memoObj),
@@ -789,10 +730,9 @@ export default function AdminStaffDetailPage() {
       setLogsLoading(false)
       ssWrite(`pc_logs_${staffId}_${selectedYmd}_v2`, { ts: Date.now(), rows })
 
+      setDraftItems([])
+      setSegments([])
       setTip(0)
-      setMisuOverride(0)
-      setCash(false)
-      setSteps([])
     } catch (e: any) {
       setError(e?.message ?? '저장 오류')
     } finally {
@@ -887,8 +827,8 @@ export default function AdminStaffDetailPage() {
       if (error) throw new Error(`근태 저장 실패: ${error.message}`)
 
       setStaff((prev) => (prev ? { ...prev, work_status: attStatus } : prev))
-
       ssWrite(`pc_staff_${staffId}_v2`, { ts: Date.now(), staff: { ...(staff as Staff), work_status: attStatus } })
+
       setMessage('근태가 저장되었습니다.')
       setAttOpen(false)
     } catch (e: any) {
@@ -956,7 +896,7 @@ export default function AdminStaffDetailPage() {
   /* ------------------------- settlement fetch (cache) ------------------------- */
   const fetchSettlementRange = async (sid: string, startYmd: string, endYmd: string) => {
     const { startIso, endIso } = getKstRangeIso7(startYmd, endYmd)
-    const cacheKey = `pc_settle_${sid}_${startYmd}_${endYmd}_v2`
+    const cacheKey = `pc_settle_${sid}_${startYmd}_${endYmd}_v4`
     const cached = ssRead<{ ts: number; rows: WorkLogRow[] }>(cacheKey, SETTLE_TTL)?.rows ?? null
     if (cached) {
       setSettleRows(cached)
@@ -1007,7 +947,6 @@ export default function AdminStaffDetailPage() {
   const titleName = staff?.nickname ?? '직원'
   const subId = staff?.login_id ?? ''
   const statusText = STAFF_STATUS_LABEL[(staff?.work_status as StaffStatus) ?? attStatus ?? 'OFF']
-  const misuBtnActive = Boolean(steps.length && steps[steps.length - 1]?.misu)
 
   return (
     <div className="space-y-6">
@@ -1138,38 +1077,30 @@ export default function AdminStaffDetailPage() {
           </div>
         </div>
 
-        {/* ✅ 3x5 버튼 */}
         <div className="mt-4">
           <div className="grid grid-cols-3 gap-2">
-            <CountButton label="반개" count={calc.jCounts.J_HALF} onInc={() => pushJ('J_HALF')} onDec={() => decJ('J_HALF')} />
-            <CountButton label="룸반개" count={calc.rCounts.RT_HALF} onInc={() => pushR('RT_HALF')} onDec={() => decR('RT_HALF')} />
+            <CountButton label="반개" count={draftCalc.jCounts.J_HALF} onInc={() => pushJ('J_HALF')} onDec={() => decJ('J_HALF')} />
+            <CountButton label="룸반개" count={draftCalc.rCounts.RT_HALF} onInc={() => pushR('RT_HALF')} onDec={() => decR('RT_HALF')} />
             <GridButton onClick={() => bumpTip(10000)}>팁 +10,000</GridButton>
 
-            <CountButton label="1개" count={calc.jCounts.J_ONE} onInc={() => pushJ('J_ONE')} onDec={() => decJ('J_ONE')} />
-            <CountButton label="룸1개" count={calc.rCounts.RT_ONE} onInc={() => pushR('RT_ONE')} onDec={() => decR('RT_ONE')} />
+            <CountButton label="1개" count={draftCalc.jCounts.J_ONE} onInc={() => pushJ('J_ONE')} onDec={() => decJ('J_ONE')} />
+            <CountButton label="룸1개" count={draftCalc.rCounts.RT_ONE} onInc={() => pushR('RT_ONE')} onDec={() => decR('RT_ONE')} />
             <GridButton onClick={() => bumpTip(50000)}>팁 +50,000</GridButton>
 
-            <CountButton label="1개반" count={calc.jCounts.J_ONE_HALF} onInc={() => pushJ('J_ONE_HALF')} onDec={() => decJ('J_ONE_HALF')} />
-            <CountButton label="♡" count={calc.heartCount} onInc={incHeart} onDec={decHeart} />
+            <CountButton label="1개반" count={draftCalc.jCounts.J_ONE_HALF} onInc={() => pushJ('J_ONE_HALF')} onDec={() => decJ('J_ONE_HALF')} />
+            <CountButton label="♡" count={draftCalc.heartCount} onInc={pushHeart} onDec={decHeart} />
             <GridButton onClick={() => bumpTip(100000)}>팁 +100,000</GridButton>
 
-            <CountButton label="2개" count={calc.jCounts.J_TWO} onInc={() => pushJ('J_TWO')} onDec={() => decJ('J_TWO')} />
-            <CountButton label="@" count={calc.atCount} onInc={incAt} onDec={decAt} />
+            <CountButton label="2개" count={draftCalc.jCounts.J_TWO} onInc={() => pushJ('J_TWO')} onDec={() => decJ('J_TWO')} />
+            <CountButton label="@" count={draftCalc.atCount} onInc={pushAt} onDec={decAt} />
             <GridButton onClick={resetTip}>팁초기화</GridButton>
 
-            <GridButton active={cash} onClick={toggleCash}>
-              현금
-            </GridButton>
-
-            <GridButton active={misuBtnActive} onClick={toggleMisuLast}>
-              미수
-            </GridButton>
-
+            <GridButton onClick={commitCash}>현금</GridButton>
+            <GridButton onClick={commitMisu}>미수</GridButton>
             <GridButton onClick={resetAll}>전체초기화</GridButton>
           </div>
         </div>
 
-        {/* ✅ 정산요약 */}
         <div className="mt-4 rounded-2xl border border-white/10 bg-white/5 p-4">
           <div className="flex items-center justify-between gap-3">
             <div className="text-sm text-white/50">정산 요약</div>
@@ -1180,39 +1111,21 @@ export default function AdminStaffDetailPage() {
           </div>
 
           <div className="mt-2 text-white font-semibold whitespace-nowrap">
-            직원 {formatCurrency(calc.staffPay)}원, 관리자 {formatCurrency(calc.adminPay)}원
+            직원 {formatCurrency(totalCalc.staffPay)}원, 관리자 {formatCurrency(totalCalc.adminPay)}원
           </div>
 
-          <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <div className="text-xs text-white/55">팁 직접입력</div>
-              <input
-                type="number"
-                inputMode="numeric"
-                min={0}
-                className="mt-2 w-full rounded-xl border border-white/12 bg-black/20 px-3 py-2 text-white outline-none placeholder:text-white/30 focus:border-white/25"
-                value={Number.isFinite(tip) ? tip : 0}
-                onChange={(e) => setTip(Math.max(0, Number(e.target.value || 0)))}
-                placeholder="0"
-              />
-            </div>
-
-            <div>
-              <div className="text-xs text-white/55">미수 직접입력</div>
-              <input
-                type="number"
-                inputMode="numeric"
-                min={0}
-                className="mt-2 w-full rounded-xl border border-white/12 bg-black/20 px-3 py-2 text-white outline-none placeholder:text-white/30 focus:border-white/25"
-                value={Number.isFinite(misuOverride) ? misuOverride : 0}
-                onChange={(e) => {
-                  const next = Math.max(0, Number(e.target.value || 0))
-                  setMisuOverride(next)
-                  if (next > 0) setCash(false)
-                }}
-                placeholder="0"
-              />
-            </div>
+          <div className="mt-3">
+            <div className="text-xs text-white/55">현재 묶음 팁 직접입력</div>
+            <input
+              type="number"
+              inputMode="numeric"
+              min={0}
+              className="mt-2 w-full rounded-xl border border-white/12 bg-black/20 px-3 py-2 text-white outline-none placeholder:text-white/30 focus:border-white/25"
+              value={Number.isFinite(tip) ? tip : 0}
+              onChange={(e) => setTip(Math.max(0, Number(e.target.value || 0)))}
+              placeholder="0"
+            />
+            <div className="mt-2 text-[11px] text-white/40">표시는 항상 일반서비스 합산 → 룸서비스 합산 → @/♡ → 팁 → 미수 순서로 정리됩니다.</div>
           </div>
         </div>
 
@@ -1231,7 +1144,6 @@ export default function AdminStaffDetailPage() {
         </div>
       </GlassCard>
 
-      {/* 내역 */}
       <GlassCard className="p-5">
         <div className="flex items-end justify-between gap-3">
           <div>
@@ -1286,10 +1198,7 @@ export default function AdminStaffDetailPage() {
                       <div className="text-white font-semibold truncate">
                         {d.timeText} · {d.storeName}
                       </div>
-
-                      {/* ✅ 저장한 관리자 표시 */}
                       <div className="mt-0.5 text-[11px] text-white/45 truncate">저장: {d.savedByName ?? '-'}</div>
-
                       <div className="mt-1 text-xs text-white/55 truncate">{compact}</div>
                       <div className="mt-1 text-[11px] text-white/45">{d.baseLabel}</div>
                     </div>
@@ -1307,7 +1216,6 @@ export default function AdminStaffDetailPage() {
         </div>
       </GlassCard>
 
-      {/* 상세 팝업 */}
       {detailOpen && detail && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-6">
           <button
@@ -1342,15 +1250,13 @@ export default function AdminStaffDetailPage() {
               </div>
 
               <div className="mt-4 space-y-2 text-sm">
-                {/* ✅ 저장한 관리자 표시 */}
                 <RowKV k="저장" v={detail.savedByName ?? '-'} />
-
                 <RowKV k="직원 정산" v={`${formatCurrency(detail.staffPay)}원`} />
                 <RowKV k="관리자 정산" v={`${formatCurrency(detail.adminPay)}원`} />
                 {detail.tip > 0 && <RowKV k="팁" v={`${formatCurrency(detail.tip)}원`} />}
                 {detail.misu && detail.misuAmount > 0 && <RowKV k="미수금액" v={`${formatCurrency(detail.misuAmount)}원`} />}
-                <RowKV k="옵션" v={`${repeatChar('♡', detail.heartCount)}${repeatChar('@', detail.atCount)}`.trim() || '-'} />
-                {(detail.cash || detail.misu) && <RowKV k="상태" v={`${detail.cash ? '현금' : ''}${detail.misu ? '미수' : ''}`} />}
+                <RowKV k="옵션" v={`${repeatChar('@', detail.atCount)}${repeatChar('♡', detail.heartCount)}`.trim() || '-'} />
+                {(detail.cash || detail.misu) && <RowKV k="상태" v={`${detail.cash ? '현금' : ''}${detail.cash && detail.misu ? ' / ' : ''}${detail.misu ? '미수' : ''}`} />}
               </div>
 
               <div className="mt-5 flex gap-2">
@@ -1375,7 +1281,6 @@ export default function AdminStaffDetailPage() {
         </div>
       )}
 
-      {/* 정산 팝업 */}
       {settleOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-6">
           <button className="absolute inset-0 bg-black/60" onClick={() => setSettleOpen(false)} type="button" aria-label="닫기" />
@@ -1503,6 +1408,7 @@ export default function AdminStaffDetailPage() {
                                 <div className="text-sm text-white font-semibold truncate">
                                   {d.timeText} · {d.storeName}
                                 </div>
+                                <div className="mt-0.5 text-[11px] text-white/45 truncate">저장: {d.savedByName ?? '-'}</div>
                                 <div className="mt-1 text-xs text-white/55 truncate">{buildCompactLineFromDerived(d)}</div>
                                 <div className="mt-1 text-[11px] text-white/45">
                                   {d.baseLabel} {d.minutes ? ` · ${d.minutes}분` : ''}
@@ -1527,7 +1433,6 @@ export default function AdminStaffDetailPage() {
         </div>
       )}
 
-      {/* 근태 모달 */}
       {attOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-6">
           <button className="absolute inset-0 bg-black/60" onClick={() => setAttOpen(false)} aria-label="닫기" />
@@ -1579,7 +1484,6 @@ export default function AdminStaffDetailPage() {
         </div>
       )}
 
-      {/* 계좌 모달 */}
       {bankOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-6">
           <button className="absolute inset-0 bg-black/60" onClick={() => setBankOpen(false)} aria-label="닫기" />
@@ -1731,7 +1635,12 @@ function normalizeWorkLogs(data: unknown): WorkLogRow[] {
     .map((r: any) => {
       const payRaw = Array.isArray(r?.staff_payment_logs) ? r.staff_payment_logs[0] : null
       const payment: PaymentRow | null = payRaw
-        ? { amount: payRaw?.amount == null ? null : Number(payRaw.amount), memo: payRaw?.memo ?? null, method: payRaw?.method ?? null, paid_at: payRaw?.paid_at ?? null }
+        ? {
+            amount: payRaw?.amount == null ? null : Number(payRaw.amount),
+            memo: payRaw?.memo ?? null,
+            method: payRaw?.method ?? null,
+            paid_at: payRaw?.paid_at ?? null,
+          }
         : null
 
       const memoObj = parseMemo(payment?.memo ?? null)
@@ -1756,7 +1665,14 @@ function pickSavedByNameFromMemo(memo: any): string | null {
   const nick = memo?.savedBy?.nickname
   const login = memo?.savedBy?.login_id
   const name = memo?.savedBy?.name
-  const s = (typeof nick === 'string' && nick.trim() ? nick : typeof name === 'string' && name.trim() ? name : typeof login === 'string' && login.trim() ? login : null)
+  const s =
+    typeof nick === 'string' && nick.trim()
+      ? nick
+      : typeof name === 'string' && name.trim()
+      ? name
+      : typeof login === 'string' && login.trim()
+      ? login
+      : null
   return s ? String(s) : null
 }
 
@@ -1768,13 +1684,42 @@ function deriveLog(w: WorkLogRow): DerivedLog | null {
   const storeName = w.stores?.name ?? '가게 미지정'
   const memo = w.memoObj
 
-  // ✅ v4
+  if (memo && memo.v === 5) {
+    const m = memo as MemoV5
+    const segs = Array.isArray(m.segments) ? m.segments : []
+    const total = calcAllSegments(segs)
+    const compactText = segs.map(formatSegmentSummary).join(' ')
+
+    return {
+      id: w.id,
+      work_at: w.work_at,
+      ts,
+      timeText,
+      storeName,
+      baseLabel: m.baseLabel || compactText || '-',
+      minutes: Number(m.baseMinutes || total.minutes || w.minutes || 0),
+      jUnits: Number.isFinite(Number(m.jUnits)) ? Number(m.jUnits) : total.jUnits,
+      rUnits: Number.isFinite(Number(m.rUnits)) ? Number(m.rUnits) : total.rUnits,
+      storeTotal: Number(m.storeTotal || total.storeTotal || 0),
+      staffPay: Number(m.staffPay || total.staffPay || 0),
+      adminPay: Number(m.adminPay || total.adminPay || 0),
+      tip: Number(m.tip || total.tip || 0),
+      cash: Boolean(m.cash),
+      misu: Boolean(m.misu),
+      misuAmount: Number(m.misuAmount || total.misuAmount || 0),
+      heartCount: total.heartCount,
+      atCount: total.atCount,
+      savedByName: pickSavedByNameFromMemo(m),
+      compactText,
+    }
+  }
+
   if (memo && memo.v === 4) {
     const m = memo as MemoV4
     const steps = Array.isArray(m.steps) ? m.steps : []
 
-    const jMinutes = steps.reduce((sum, s) => (s.kind === 'J' ? sum + (J_SVC as any)[s.key]?.minutes || 0 : sum), 0)
-    const rMinutes = steps.reduce((sum, s) => (s.kind === 'R' ? sum + (R_SVC as any)[s.key]?.minutes || 0 : sum), 0)
+    const jMinutes = steps.reduce((sum, s) => (s.kind === 'J' ? sum + ((J_SVC as any)[s.key]?.minutes || 0) : sum), 0)
+    const rMinutes = steps.reduce((sum, s) => (s.kind === 'R' ? sum + ((R_SVC as any)[s.key]?.minutes || 0) : sum), 0)
 
     const heartCount = steps.reduce((sum, s) => sum + Math.max(0, Number((s as any).heart || 0)), 0)
     const atCount = steps.reduce((sum, s) => sum + Math.max(0, Number((s as any).at || 0)), 0)
@@ -1799,10 +1744,10 @@ function deriveLog(w: WorkLogRow): DerivedLog | null {
       heartCount,
       atCount,
       savedByName: pickSavedByNameFromMemo(m),
+      compactText: null,
     }
   }
 
-  // v3
   if (memo && memo.v === 3) {
     const m = memo as MemoV3
     const jUnits = Number.isFinite(Number(m.jUnits)) ? Number(m.jUnits) : unitsFromCountsJ(m.jCounts)
@@ -1827,10 +1772,10 @@ function deriveLog(w: WorkLogRow): DerivedLog | null {
       heartCount: Math.max(0, Number(m.heartCount || 0)),
       atCount: Math.max(0, Number(m.atCount || 0)),
       savedByName: pickSavedByNameFromMemo(m),
+      compactText: null,
     }
   }
 
-  // v2
   if (memo && memo.v === 2) {
     const m = memo as MemoV2
     const baseMinutes = Number(m.baseMinutes || w.minutes || 0)
@@ -1854,10 +1799,10 @@ function deriveLog(w: WorkLogRow): DerivedLog | null {
       heartCount: m.heart ? 1 : 0,
       atCount: m.at ? 1 : 0,
       savedByName: pickSavedByNameFromMemo(m),
+      compactText: null,
     }
   }
 
-  // v1
   if (memo && memo.v === 1) {
     const m = memo as MemoV1
     const mins = Number(w.minutes || 0)
@@ -1881,10 +1826,10 @@ function deriveLog(w: WorkLogRow): DerivedLog | null {
       heartCount: m.heart ? 1 : 0,
       atCount: m.at ? 1 : 0,
       savedByName: pickSavedByNameFromMemo(m),
+      compactText: null,
     }
   }
 
-  // fallback
   const fallbackStaff = Math.max(0, Number(w.payment?.amount ?? 0))
   const mins = Number(w.minutes || 0)
   return {
@@ -1907,14 +1852,16 @@ function deriveLog(w: WorkLogRow): DerivedLog | null {
     heartCount: Boolean(w.option_heart) ? 1 : 0,
     atCount: Boolean(w.option_at) ? 1 : 0,
     savedByName: null,
+    compactText: null,
   }
 }
 
-function parseMemo(memo: string | null): MemoV1 | MemoV2 | MemoV3 | MemoV4 | null {
+function parseMemo(memo: string | null): MemoV1 | MemoV2 | MemoV3 | MemoV4 | MemoV5 | null {
   if (!memo) return null
   try {
     const obj = JSON.parse(memo)
     if (!obj || typeof obj !== 'object') return null
+    if (obj.v === 5) return obj as MemoV5
     if (obj.v === 4) return obj as MemoV4
     if (obj.v === 3) return obj as MemoV3
     if (obj.v === 2) return obj as MemoV2
@@ -1925,20 +1872,162 @@ function parseMemo(memo: string | null): MemoV1 | MemoV2 | MemoV3 | MemoV4 | nul
   }
 }
 
-/* ------------------------- compact line helpers ------------------------- */
-function buildCompactLineFromDerived(d: DerivedLog) {
-  const t = isoToKoTimeText(d.work_at)
-  const n = buildSvcSummary(d.jUnits, d.rUnits)
-  const addons = `${repeatChar('♡', d.heartCount)}${repeatChar('@', d.atCount)}`
-  const misuMark = d.misu ? '■■' : ''
-  return `${t} ${n}${addons ? ` ${addons}` : ''}${misuMark ? ` ${misuMark}` : ''}`.trim()
+/* ------------------------- compact / calc helpers ------------------------- */
+function cloneItems(items: DraftItem[]): DraftItem[] {
+  return items.map((it) => ({ ...it }))
 }
 
-function formatStepForInput(s: Step) {
-  const svcLabel = s.kind === 'J' ? J_SVC[s.key].label : R_SVC[s.key].label
-  const addons = `${repeatChar('♡', s.heart)}${repeatChar('@', s.at)}`
-  const misu = s.misu ? '■■' : ''
-  return `${svcLabel}${addons ? ` ${addons}` : ''}${misu ? ` ${misu}` : ''}`.trim()
+function formatTipUnit(tip: number) {
+  const safe = Math.max(0, Number(tip || 0))
+  if (safe <= 0) return ''
+  return `(${Math.round(safe / 1000)})`
+}
+
+function formatSegmentSummary(seg: Segment) {
+  const calc = calcOneSegment(seg.items, seg.tip, seg.kind)
+
+  const jText = buildSvcSummaryCompact(calc.jUnits, 0)
+  const rText = buildSvcSummaryCompact(0, calc.rUnits)
+  const addonText = `${repeatChar('@', calc.atCount)}${repeatChar('♡', calc.heartCount)}`
+  const tipText = formatTipUnit(seg.tip)
+  const misuMark = seg.kind === 'MISU' ? '◼︎◼︎' : ''
+
+  return `${jText}${rText}${addonText}${tipText}${misuMark}`.trim() || `${tipText}${misuMark}`.trim() || '0개'
+}
+
+function buildCompactLineFromDerived(d: DerivedLog) {
+  const t = isoToKoTimeText(d.work_at)
+
+  if (d.compactText) {
+    return `${t} ${d.compactText}`.trim()
+  }
+
+  const jText = buildSvcSummaryCompact(d.jUnits, 0)
+  const rText = buildSvcSummaryCompact(0, d.rUnits)
+  const addonText = `${repeatChar('@', d.atCount)}${repeatChar('♡', d.heartCount)}`
+  const tipText = formatTipUnit(d.tip)
+  const misuMark = d.misu ? '◼︎' : ''
+
+  return `${t} ${jText}${rText}${addonText}${tipText}${misuMark}`.trim()
+}
+
+function emptyCalcResult(): CalcResult {
+  return {
+    jCounts: { ...EMPTY_J_COUNTS },
+    rCounts: { ...EMPTY_R_COUNTS },
+    heartCount: 0,
+    atCount: 0,
+    baseLabel: '-',
+    minutes: 0,
+    svcUnits: 0,
+    jUnits: 0,
+    rUnits: 0,
+    staffBase: 0,
+    adminBase: 0,
+    staffAdd: 0,
+    adminAdd: 0,
+    tip: 0,
+    misuAmount: 0,
+    staffPay: 0,
+    adminPay: 0,
+    storeTotal: 0,
+    hasCash: false,
+    hasMisu: false,
+  }
+}
+
+function calcOneSegment(items: DraftItem[], tipValue: number, kind: SettleKind): CalcResult {
+  const out = emptyCalcResult()
+
+  for (const it of items) {
+    if (it.kind === 'ADDON') {
+      if (it.addon === 'HEART') {
+        out.heartCount += 1
+        out.staffAdd += ADDON_HEART.staff
+        out.adminAdd += ADDON_HEART.admin
+        out.storeTotal += ADDON_HEART.store
+      } else {
+        out.atCount += 1
+        out.staffAdd += ADDON_AT.staff
+        out.adminAdd += ADDON_AT.admin
+        out.storeTotal += ADDON_AT.store
+      }
+      continue
+    }
+
+    if (it.svcKind === 'J') {
+      out.jCounts[it.key] = (out.jCounts[it.key] || 0) + 1
+      const svc = J_SVC[it.key]
+      out.minutes += svc.minutes
+      out.jUnits += svc.minutes / 60
+      out.staffBase += svc.staff
+      out.adminBase += svc.admin
+      out.storeTotal += svc.store
+    } else {
+      out.rCounts[it.key] = (out.rCounts[it.key] || 0) + 1
+      const svc = R_SVC[it.key]
+      out.minutes += svc.minutes
+      out.rUnits += svc.minutes / 60
+      out.staffBase += svc.staff
+      out.adminBase += svc.admin
+      out.storeTotal += svc.store
+    }
+  }
+
+  out.tip = Math.max(0, Number(tipValue || 0))
+  out.svcUnits = out.minutes / 60
+  out.staffPay = out.staffBase + out.staffAdd + out.tip
+  out.adminPay = out.adminBase + out.adminAdd
+  out.hasCash = kind === 'CASH'
+  out.hasMisu = kind === 'MISU'
+  out.misuAmount = kind === 'MISU' ? out.storeTotal + out.tip : 0
+
+  const jText = buildSvcSummaryCompact(out.jUnits, 0)
+  const rText = buildSvcSummaryCompact(0, out.rUnits)
+  out.baseLabel = `${jText}${rText}`.trim() || '-'
+
+  return out
+}
+
+function mergeCalc(a: CalcResult, b: CalcResult): CalcResult {
+  return {
+    jCounts: {
+      J_HALF: a.jCounts.J_HALF + b.jCounts.J_HALF,
+      J_ONE: a.jCounts.J_ONE + b.jCounts.J_ONE,
+      J_ONE_HALF: a.jCounts.J_ONE_HALF + b.jCounts.J_ONE_HALF,
+      J_TWO: a.jCounts.J_TWO + b.jCounts.J_TWO,
+    },
+    rCounts: {
+      RT_HALF: a.rCounts.RT_HALF + b.rCounts.RT_HALF,
+      RT_ONE: a.rCounts.RT_ONE + b.rCounts.RT_ONE,
+    },
+    heartCount: a.heartCount + b.heartCount,
+    atCount: a.atCount + b.atCount,
+    baseLabel: '-',
+    minutes: a.minutes + b.minutes,
+    svcUnits: a.svcUnits + b.svcUnits,
+    jUnits: a.jUnits + b.jUnits,
+    rUnits: a.rUnits + b.rUnits,
+    staffBase: a.staffBase + b.staffBase,
+    adminBase: a.adminBase + b.adminBase,
+    staffAdd: a.staffAdd + b.staffAdd,
+    adminAdd: a.adminAdd + b.adminAdd,
+    tip: a.tip + b.tip,
+    misuAmount: a.misuAmount + b.misuAmount,
+    staffPay: a.staffPay + b.staffPay,
+    adminPay: a.adminPay + b.adminPay,
+    storeTotal: a.storeTotal + b.storeTotal,
+    hasCash: a.hasCash || b.hasCash,
+    hasMisu: a.hasMisu || b.hasMisu,
+  }
+}
+
+function calcAllSegments(segments: Segment[]): CalcResult {
+  let acc = emptyCalcResult()
+  for (const seg of segments) {
+    acc = mergeCalc(acc, calcOneSegment(seg.items, seg.tip, seg.kind))
+  }
+  return acc
 }
 
 function repeatChar(ch: string, n: number) {
@@ -1951,19 +2040,20 @@ function formatUnits(units: number, prefix: '' | '룸') {
   const u = Number.isFinite(units) ? units : 0
   const rounded = Math.round(u * 2) / 2
   if (rounded <= 0) return ''
+
   const intPart = Math.floor(rounded)
   const half = rounded - intPart >= 0.5
+
   if (intPart === 0 && half) return prefix ? `${prefix}반개` : '반개'
   if (!half) return prefix ? `${prefix}${intPart}개` : `${intPart}개`
   if (intPart === 1) return prefix ? `${prefix}1개반` : '1개반'
   return prefix ? `${prefix}${intPart}개반` : `${intPart}개반`
 }
 
-function buildSvcSummary(jUnits: number, rUnits: number) {
+function buildSvcSummaryCompact(jUnits: number, rUnits: number) {
   const j = formatUnits(jUnits, '')
   const r = formatUnits(rUnits, '룸')
-  if (j && r) return `${j} + ${r}`
-  return j || r || '0개'
+  return `${j}${r}`.trim() || '0개'
 }
 
 function unitsFromCountsJ(counts: Record<Exclude<JSvcKey, 'NONE'>, number>) {

@@ -8,7 +8,7 @@ import { PageHeader } from '@/components/ui/PageHeader'
 import { ProButton } from '@/components/ui/ProButton'
 import { cn } from '@/lib/cn'
 import { AdminNotificationBell } from '@/components/AdminNotificationBell'
-import { RefreshCcw, CheckCircle2, X } from 'lucide-react'
+import { RefreshCcw, CheckCircle2, X, ChevronLeft, ChevronRight } from 'lucide-react'
 
 type StaffStatus = 'WORKING' | 'CAR_WAIT' | 'LODGE_WAIT' | 'OFF'
 type StaffGroup = 'ON' | 'OFF'
@@ -46,7 +46,6 @@ const STAFF_CACHE_TTL_MS = 60 * 1000
 const PREFETCH_TOP_N = 6
 const PAGE_CHUNK = 40
 
-// 미수 캐시
 const MISU_CACHE_KEY = 'pc_admin_misu_rows_v1'
 const MISU_CACHE_TTL_MS = 30 * 1000
 
@@ -83,9 +82,10 @@ type SettleLog = {
   misuAmount: number
   cash: boolean
   savedBy: string | null
+  memoObj: any
 }
 
-const SETTLE_ALL_TTL = 30 * 1000
+const SETTLE_ALL_TTL = 10 * 1000
 
 export default function AdminStaffPage() {
   const router = useRouter()
@@ -124,8 +124,7 @@ export default function AdminStaffPage() {
   const [misuSyncTick, setMisuSyncTick] = useState(0)
 
   // settle (탭)
-  const [settleStartYmd, setSettleStartYmd] = useState(getKstDateString())
-  const [settleEndYmd, setSettleEndYmd] = useState(getKstDateString())
+  const [settleDayYmd, setSettleDayYmd] = useState(getKstDateString())
   const [settleLoading, setSettleLoading] = useState(false)
   const [settleError, setSettleError] = useState<string | null>(null)
   const [settleRows, setSettleRows] = useState<SettleLog[]>([])
@@ -199,7 +198,6 @@ export default function AdminStaffPage() {
     }
   }, [])
 
-  // (레거시) 체크인/체크아웃 기반 출근 여부 추정
   const isWorkingLegacy = (r: StaffRow) => {
     if (!r.last_checkin_at) return false
     if (!r.last_checkout_at) return true
@@ -212,7 +210,6 @@ export default function AdminStaffPage() {
     return isWorkingLegacy(r) ? 'WORKING' : 'OFF'
   }
 
-  // 그룹(출근/퇴근)
   const groupOfStatus = (st: StaffStatus): StaffGroup => (st === 'OFF' ? 'OFF' : 'ON')
   const groupOfRow = (r: StaffRow): StaffGroup => groupOfStatus(statusOf(r))
 
@@ -254,7 +251,6 @@ export default function AdminStaffPage() {
     return list
   }, [rows, visitMap, sortMode])
 
-  // 점진 렌더 sentinel
   useEffect(() => {
     if (tab !== 'staff') return
     const el = sentinelRef.current
@@ -272,7 +268,6 @@ export default function AdminStaffPage() {
     return () => io.disconnect()
   }, [ordered.length, tab])
 
-  // 상위 일부 prefetch
   useEffect(() => {
     if (tab !== 'staff') return
     const top = ordered.slice(0, PREFETCH_TOP_N)
@@ -293,7 +288,6 @@ export default function AdminStaffPage() {
     })
   }
 
-  // 직원 추가
   const onCreate = async () => {
     setError(null)
     setCreating(true)
@@ -324,7 +318,6 @@ export default function AdminStaffPage() {
       setPassword('')
       setNickname('')
 
-      // 재동기화
       setSyncing(true)
       const { data, error } = await supabaseClient
         .from('user_profiles')
@@ -442,7 +435,6 @@ export default function AdminStaffPage() {
       const staffIds = Array.from(new Set(filtered.map((x) => x.staffId).filter(Boolean)))
       const workLogIds = Array.from(new Set(filtered.map((x) => x.workLogId).filter((x): x is number => typeof x === 'number')))
 
-      // staff 프로필
       const staffMap = new Map<string, { nickname: string }>()
       if (staffIds.length > 0) {
         const { data: profRows, error: profErr } = await supabaseClient.from('user_profiles').select('id, nickname').in('id', staffIds)
@@ -454,7 +446,6 @@ export default function AdminStaffPage() {
         }
       }
 
-      // work_log (가게명)
       const workMap = new Map<number, { storeName: string }>()
       if (workLogIds.length > 0) {
         const { data: wRows, error: wErr } = await supabaseClient.from('staff_work_logs').select('id, stores(name)').in('id', workLogIds)
@@ -467,8 +458,8 @@ export default function AdminStaffPage() {
             (r as any)?.stores?.name != null
               ? String((r as any).stores.name)
               : (r as any)?.stores?.[0]?.name
-              ? String((r as any).stores[0].name)
-              : '가게 미지정'
+                ? String((r as any).stores[0].name)
+                : '가게 미지정'
           workMap.set(id, { storeName })
         }
       }
@@ -479,8 +470,6 @@ export default function AdminStaffPage() {
         const storeName = w?.storeName ?? '가게 미지정'
 
         const ymd = toKstDateStringAt7(x.baseIso)
-
-        // ✅ 합산 + “미수까지만(■■까지)” 문자열
         const lineText = buildMisuOnlyText({ memoObj: x.memoObj, misuAmount: x.misuAmount })
 
         return {
@@ -531,13 +520,12 @@ export default function AdminStaffPage() {
       arr.push(it)
       map.set(it.ymd, arr)
     }
-    const days = Array.from(map.entries())
+    return Array.from(map.entries())
       .map(([ymd, items]) => {
         const sum = items.reduce((s, x) => s + (x.misuAmount || 0), 0)
         return { ymd, items, sum, count: items.length }
       })
       .sort((a, b) => (a.ymd < b.ymd ? 1 : -1))
-    return days
   }, [misuItems, misuSyncTick])
 
   const misuTotal = useMemo(() => {
@@ -573,15 +561,19 @@ export default function AdminStaffPage() {
   }
 
   /* ------------------------- 전체 정산(탭) ------------------------- */
-  const fetchSettlementAll = async (startYmd: string, endYmd: string) => {
-    const { startIso, endIso } = getKstRangeIso7(startYmd, endYmd)
+  const fetchSettlementDay = async (dayYmd: string, opts?: { force?: boolean }) => {
+    const force = Boolean(opts?.force)
+    const cacheKey = `pc_admin_settle_day_${dayYmd}_v3`
 
-    const cacheKey = `pc_admin_settle_all_${startYmd}_${endYmd}_v1`
-    const cached = ssRead<{ ts: number; rows: SettleLog[] }>(cacheKey, SETTLE_ALL_TTL)?.rows ?? null
-    if (cached) {
-      setSettleRows(cached)
-      return
+    if (!force) {
+      const cached = ssRead<{ ts: number; rows: SettleLog[] }>(cacheKey, SETTLE_ALL_TTL)?.rows ?? null
+      if (cached) {
+        setSettleRows(cached)
+        return
+      }
     }
+
+    const { startIso, endIso } = getKstDayRangeIso7(dayYmd)
 
     const pageSize = 1000
     let from = 0
@@ -623,13 +615,11 @@ export default function AdminStaffPage() {
     ssWrite(cacheKey, { ts: Date.now(), rows })
   }
 
-  const runSettlementFetchRange = async (startYmd: string, endYmd: string) => {
+  const runSettlementFetchDay = async (dayYmd: string, opts?: { force?: boolean }) => {
     setSettleError(null)
     setSettleLoading(true)
     try {
-      if (!startYmd || !endYmd) throw new Error('기간을 선택하세요.')
-      if (startYmd > endYmd) throw new Error('시작일이 종료일보다 늦습니다.')
-      await fetchSettlementAll(startYmd, endYmd)
+      await fetchSettlementDay(dayYmd, { force: Boolean(opts?.force) })
     } catch (e: any) {
       setSettleError(e?.message ?? '정산 조회 오류')
     } finally {
@@ -637,53 +627,58 @@ export default function AdminStaffPage() {
     }
   }
 
-  const runSettlementFetch = async () => {
-    await runSettlementFetchRange(settleStartYmd, settleEndYmd)
-  }
-
-  // ✅ 정산 탭 들어오면 “오늘” 자동 조회
   useEffect(() => {
     if (tab !== 'settle') return
-    const today = getKstDateString()
-    setSettleStartYmd(today)
-    setSettleEndYmd(today)
-    runSettlementFetchRange(today, today).catch(() => {})
+    runSettlementFetchDay(settleDayYmd, { force: true }).catch(() => {})
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tab])
+  }, [tab, settleDayYmd])
 
-  const settleByDay = useMemo(() => {
+  const settleStaffBlocks = useMemo(() => {
     if (tab !== 'settle') return []
-    const map = new Map<string, SettleLog[]>()
-    for (const r of settleRows) {
-      const ymd = toKstDateStringAt7(r.work_at)
-      const arr = map.get(ymd) ?? []
-      arr.push(r)
-      map.set(ymd, arr)
-    }
-    return Array.from(map.entries())
-      .map(([ymd, items]) => {
-        items.sort((a, b) => a.ts - b.ts)
-        const staffSum = items.reduce((s, x) => s + (x.staffPay || 0), 0)
-        const adminSum = items.reduce((s, x) => s + (x.adminPay || 0), 0)
-        const tipSum = items.reduce((s, x) => s + (x.tip || 0), 0)
-        const misuSum = items.reduce((s, x) => s + (x.misuAmount || 0), 0)
-        const storeSum = items.reduce((s, x) => s + (x.storeTotal || 0), 0)
-        const minutesSum = items.reduce((s, x) => s + (x.minutes || 0), 0)
-        return { ymd, items, staffSum, adminSum, tipSum, misuSum, storeSum, minutesSum, count: items.length }
-      })
-      .sort((a, b) => (a.ymd < b.ymd ? 1 : -1))
-  }, [tab, settleRows])
 
-  const settleTotal = useMemo(() => {
-    if (tab !== 'settle') return { staffSum: 0, adminSum: 0, tipSum: 0, misuSum: 0, storeSum: 0, minutesSum: 0, count: 0, storeCash: 0 }
-    const staffSum = settleRows.reduce((s, x) => s + (x.staffPay || 0), 0)
-    const adminSum = settleRows.reduce((s, x) => s + (x.adminPay || 0), 0)
-    const tipSum = settleRows.reduce((s, x) => s + (x.tip || 0), 0)
-    const misuSum = settleRows.reduce((s, x) => s + (x.misuAmount || 0), 0)
-    const storeSum = settleRows.reduce((s, x) => s + (x.storeTotal || 0), 0)
-    const minutesSum = settleRows.reduce((s, x) => s + (x.minutes || 0), 0)
-    const storeCash = Math.max(0, storeSum - misuSum)
-    return { staffSum, adminSum, tipSum, misuSum, storeSum, minutesSum, count: settleRows.length, storeCash }
+    const map = new Map<
+      string,
+      {
+        staffId: string
+        staffName: string
+        staffUnit: number
+        adminSum: number
+        items: SettleLog[]
+        firstTs: number
+      }
+    >()
+
+    for (const row of settleRows) {
+      const key = row.staffId
+      const prev = map.get(key)
+      const staffUnit = Math.round((row.staffPay || 0) / 1000)
+
+      if (!prev) {
+        map.set(key, {
+          staffId: row.staffId,
+          staffName: row.staffName,
+          staffUnit,
+          adminSum: Math.max(0, Number(row.adminPay || 0)),
+          items: [row],
+          firstTs: row.ts,
+        })
+      } else {
+        prev.staffUnit += staffUnit
+        prev.adminSum += Math.max(0, Number(row.adminPay || 0))
+        prev.items.push(row)
+        prev.firstTs = Math.min(prev.firstTs, row.ts)
+      }
+    }
+
+    return Array.from(map.values())
+      .map((block) => {
+        block.items.sort((a, b) => a.ts - b.ts)
+        return block
+      })
+      .sort((a, b) => {
+        if (a.firstTs !== b.firstTs) return a.firstTs - b.firstTs
+        return a.staffName.localeCompare(b.staffName, 'ko')
+      })
   }, [tab, settleRows])
 
   return (
@@ -725,7 +720,6 @@ export default function AdminStaffPage() {
           미수 관리
         </button>
 
-        {/* ✅ 정산 탭 */}
         <button
           type="button"
           onClick={() => setTab('settle')}
@@ -837,7 +831,6 @@ export default function AdminStaffPage() {
             </div>
           </GlassCard>
 
-          {/* 직원 추가 모달 */}
           {open && (
             <div className="fixed inset-0 z-50 flex items-center justify-center p-6">
               <button className="absolute inset-0 bg-black/60" onClick={() => setOpen(false)} type="button" aria-label="닫기" />
@@ -846,7 +839,6 @@ export default function AdminStaffPage() {
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <div className="text-white text-lg font-semibold">직원 추가</div>
-                      <div className="mt-1 text-sm text-white/55">로그인ID/비밀번호/닉네임</div>
                     </div>
                     <button
                       onClick={() => setOpen(false)}
@@ -1000,7 +992,7 @@ export default function AdminStaffPage() {
 
             <button
               type="button"
-              onClick={runSettlementFetch}
+              onClick={() => runSettlementFetchDay(settleDayYmd, { force: true })}
               className={cn(
                 'inline-flex items-center gap-2',
                 'h-9 px-3 rounded-xl border border-white/12 bg-white/5',
@@ -1010,141 +1002,66 @@ export default function AdminStaffPage() {
               disabled={settleLoading}
             >
               <RefreshCcw className={cn('h-4 w-4', settleLoading && 'animate-spin')} />
-              조회
+              새로고침
             </button>
           </div>
 
           <div className="mt-2 text-sm text-white/55">기준 : 07:00 ~ 다음날 07:00</div>
 
-          <div className="mt-5 grid grid-cols-2 gap-3">
-            <div>
-              <div className="text-xs text-white/55">시작일</div>
-              <input
-                type="date"
-                className="mt-2 w-full rounded-xl border border-white/12 bg-black/20 px-3 py-2 text-white outline-none focus:border-white/25"
-                value={settleStartYmd}
-                onChange={(e) => setSettleStartYmd(e.target.value)}
-              />
-            </div>
-            <div>
-              <div className="text-xs text-white/55">종료일</div>
-              <input
-                type="date"
-                className="mt-2 w-full rounded-xl border border-white/12 bg-black/20 px-3 py-2 text-white outline-none focus:border-white/25"
-                value={settleEndYmd}
-                onChange={(e) => setSettleEndYmd(e.target.value)}
-              />
-            </div>
-          </div>
-
-          <div className="mt-3 flex flex-wrap items-center gap-2">
+          <div className="mt-4 flex items-center justify-center gap-3">
             <button
               type="button"
-              onClick={() => {
-                const today = getKstDateString()
-                setSettleStartYmd(today)
-                setSettleEndYmd(today)
-                runSettlementFetchRange(today, today).catch(() => {})
-              }}
-              className="rounded-xl border border-white/12 bg-white/5 px-3 py-2 text-sm text-white/80 hover:bg-white/10 transition"
+              onClick={() => setSettleDayYmd((prev) => addDaysYmd(prev, -1))}
+              className="h-9 w-9 inline-flex items-center justify-center rounded-xl border border-white/12 bg-white/5 text-white/80 hover:bg-white/10 transition"
+              aria-label="전날"
             >
-              오늘
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                const end = getKstDateString()
-                const start = addDaysYmd(end, -6)
-                setSettleStartYmd(start)
-                setSettleEndYmd(end)
-                runSettlementFetchRange(start, end).catch(() => {})
-              }}
-              className="rounded-xl border border-white/12 bg-white/5 px-3 py-2 text-sm text-white/80 hover:bg-white/10 transition"
-            >
-              최근 일주일
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                const end = getKstDateString()
-                const start = addDaysYmd(end, -29)
-                setSettleStartYmd(start)
-                setSettleEndYmd(end)
-                runSettlementFetchRange(start, end).catch(() => {})
-              }}
-              className="rounded-xl border border-white/12 bg-white/5 px-3 py-2 text-sm text-white/80 hover:bg-white/10 transition"
-            >
-              최근 한달
+              <ChevronLeft className="h-4 w-4" />
             </button>
 
-            <div className="flex-1" />
+            <div className="min-w-[140px] text-center text-white font-semibold">{settleDayYmd}</div>
+
+            <button
+              type="button"
+              onClick={() => setSettleDayYmd((prev) => addDaysYmd(prev, 1))}
+              className="h-9 w-9 inline-flex items-center justify-center rounded-xl border border-white/12 bg-white/5 text-white/80 hover:bg-white/10 transition"
+              aria-label="다음날"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </button>
           </div>
 
           {settleError && (
             <div className="mt-4 rounded-xl border border-red-400/30 bg-red-500/10 px-4 py-3 text-sm text-red-100">{settleError}</div>
           )}
 
-          <div className="mt-5 rounded-2xl border border-white/10 bg-white/5 p-4">
-            <div className="text-sm text-white/50">기간 합계</div>
-            <div className="mt-1 text-white font-semibold">
-              직원 {formatCurrency(settleTotal.staffSum)}원 · 관리자 {formatCurrency(settleTotal.adminSum)}원
-            </div>
-            <div className="mt-2 text-xs text-white/55 space-y-1">
-              <div>팁 : {formatCurrency(settleTotal.tipSum)}원</div>
-              <div>미수 : {formatCurrency(settleTotal.misuSum)}원</div>
-              <div>총액 : {formatCurrency(settleTotal.storeSum)}원</div>
-              <div>결제완료 : {formatCurrency(settleTotal.storeCash)}원</div>
-              <div>총 시간 : {formatMinutes(settleTotal.minutesSum)} · {settleTotal.count}건</div>
-            </div>
-          </div>
-
-          <div className="mt-5 max-h-[60vh] overflow-y-auto pr-1">
+          <div className="mt-5">
             {settleLoading && <div className="py-6 text-sm text-white/60">정산 내역 불러오는 중...</div>}
-            {!settleLoading && settleByDay.length === 0 && <div className="py-6 text-sm text-white/60">조회 결과가 없습니다.</div>}
+            {!settleLoading && settleStaffBlocks.length === 0 && <div className="py-6 text-sm text-white/60">해당 날짜에 정산 내역이 없습니다.</div>}
 
             {!settleLoading &&
-              settleByDay.map((day) => (
-                <div key={day.ymd} className="mb-4">
-                  <div className="flex items-end justify-between gap-3">
-                    <div className="text-white font-semibold">{day.ymd}</div>
-                    <div className="text-xs text-white/60 text-right">
-                      <div>
-                        직원 {formatCurrency(day.staffSum)} · 관리자 {formatCurrency(day.adminSum)}
-                      </div>
-                      <div>
-                        팁 {formatCurrency(day.tipSum)} · 미수 {formatCurrency(day.misuSum)}
-                      </div>
-                      <div>
-                        총액 {formatCurrency(day.storeSum)} · {formatMinutes(day.minutesSum)} · {day.count}건
-                      </div>
+              settleStaffBlocks.map((block) => (
+                <div key={block.staffId} className="mb-4 rounded-2xl border border-white/10 bg-black/10">
+                  <div className="px-4 py-3 border-b border-white/10">
+                    <div className="text-white font-semibold">
+                      {block.staffName} {block.staffUnit}
                     </div>
                   </div>
 
-                  <div className="mt-2 divide-y divide-white/10 rounded-2xl border border-white/10 bg-black/10">
-                    {day.items.map((r) => (
-                      <div key={`${r.staffId}_${r.id}`} className="px-4 py-3">
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="min-w-0">
-                            <div className="text-sm text-white font-semibold truncate">
-                              {r.timeText} · {r.staffName} · {r.storeName}
-                            </div>
-                            <div className="mt-1 text-[11px] text-white/55">
-                              {r.savedBy ?? '-'}
-                              {r.minutes ? ` · ${r.minutes}분` : ''}
-                              {r.tip > 0 ? ` · 팁 ${formatCurrency(r.tip)}원` : ''}
-                              {r.misuAmount > 0 ? ` · 미수 ${formatCurrency(r.misuAmount)}원` : ''}
-                            </div>
-                          </div>
-
-                          <div className="shrink-0 text-right">
-                            <div className="text-sm text-white/85 font-semibold">
-                              {formatCurrency(r.staffPay)} / {formatCurrency(r.adminPay)}
-                            </div>
-                            <div className="mt-1 text-[11px] text-white/45">가게 {formatCurrency(r.storeTotal)}원</div>
-                          </div>
+                  <div className="divide-y divide-white/10">
+                    {block.items.map((row) => (
+                      <div key={row.id} className="px-4 py-3">
+                        <div className="text-sm text-white/85 truncate">
+                          {row.storeName}
+                          {isoToKoTimeText(row.work_at)}
+                          {' '}
+                          {buildSettleCompactText(row.memoObj, row.minutes, row.misuAmount)}
                         </div>
                       </div>
                     ))}
+                  </div>
+
+                  <div className="px-4 py-3 border-t border-white/10 text-sm font-semibold text-white/80">
+                    {formatCurrency(block.adminSum)}
                   </div>
                 </div>
               ))}
@@ -1246,6 +1163,13 @@ function isoToHm(iso: string) {
   return d.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false })
 }
 
+function isoToKoTimeText(iso: string) {
+  const d = new Date(iso)
+  const h = d.getHours()
+  const m = d.getMinutes()
+  return `${String(h).padStart(2, '0')}시${String(m).padStart(2, '0')}분`
+}
+
 function toKstDateStringAt7(iso: string) {
   const d = new Date(iso)
   const hh = d.getHours()
@@ -1263,51 +1187,133 @@ function repeatChar(ch: string, n: number) {
   return new Array(k).fill(ch).join('')
 }
 
-/* ------------------ ✅ v4: 합산 + “미수까지만(■■까지)” ------------------ */
-const SVC_MINUTES: Record<string, number> = {
+/* ------------------ 표시용 service compact helpers ------------------ */
+const J_KEY_MINUTES: Record<string, number> = {
   J_HALF: 30,
   J_ONE: 60,
   J_ONE_HALF: 90,
   J_TWO: 120,
+}
+
+const R_KEY_MINUTES: Record<string, number> = {
   RT_HALF: 30,
   RT_ONE: 60,
 }
 
-const NUM_KO: Record<number, string> = {
-  1: '한',
-  2: '두',
-  3: '세',
-  4: '네',
-  5: '다섯',
-  6: '여섯',
-  7: '일곱',
-  8: '여덟',
-  9: '아홉',
-  10: '열',
-}
-function numToKo(n: number) {
-  return NUM_KO[n] ?? String(n)
+function formatHalfUnitText(minutes: number, prefix: '' | '룸') {
+  const half = Math.round(Math.max(0, Number(minutes || 0)) / 30)
+  if (half <= 0) return ''
+
+  const full = Math.floor(half / 2)
+  const hasHalf = half % 2 === 1
+
+  if (full === 0 && hasHalf) return prefix ? `${prefix}반개` : '반개'
+  if (!hasHalf) return prefix ? `${prefix}${full}개` : `${full}개`
+  return prefix ? `${prefix}${full}개반` : `${full}개반`
 }
 
-function formatUnitsKo(units: number, prefix: '' | '룸') {
-  const u = Math.round((Number.isFinite(units) ? units : 0) * 2) / 2
-  if (u <= 0) return ''
-  const intPart = Math.floor(u)
-  const hasHalf = u - intPart >= 0.5
+function extractCompactPartsFromMemo(memoObj: any, fallbackMinutes = 0, fallbackMisuAmount = 0) {
+  let jMinutes = 0
+  let rMinutes = 0
+  let atCount = 0
+  let heartCount = 0
+  let tip = 0
+  let misuAmount = Math.max(0, Number(fallbackMisuAmount || 0))
 
-  if (intPart === 0 && hasHalf) return prefix ? `${prefix}반개` : '반개'
-  if (!hasHalf) return prefix ? `${prefix}${numToKo(intPart)}개` : `${numToKo(intPart)}개`
-  return prefix ? `${prefix}${numToKo(intPart)}개반` : `${numToKo(intPart)}개반`
+  if (memoObj && typeof memoObj === 'object') {
+    tip = Math.max(0, Number(memoObj?.tip ?? 0))
+    misuAmount = Math.max(0, Number(memoObj?.misuAmount ?? misuAmount ?? 0))
+
+    if (memoObj.v === 4 && Array.isArray(memoObj.steps)) {
+      for (const s of memoObj.steps as any[]) {
+        const key = String(s?.key ?? '')
+        if (s?.kind === 'R' || key.startsWith('RT_')) rMinutes += Math.max(0, Number(R_KEY_MINUTES[key] ?? 0))
+        else jMinutes += Math.max(0, Number(J_KEY_MINUTES[key] ?? 0))
+
+        atCount += Math.max(0, Number(s?.at ?? 0))
+        heartCount += Math.max(0, Number(s?.heart ?? 0))
+      }
+      return { jMinutes, rMinutes, atCount, heartCount, tip, misuAmount }
+    }
+
+    if (memoObj.v === 3) {
+      const jCounts = memoObj?.jCounts ?? {}
+      const rCounts = memoObj?.rCounts ?? {}
+
+      for (const k of Object.keys(J_KEY_MINUTES)) {
+        const c = Math.max(0, Number(jCounts?.[k] ?? 0))
+        jMinutes += c * J_KEY_MINUTES[k]
+      }
+      for (const k of Object.keys(R_KEY_MINUTES)) {
+        const c = Math.max(0, Number(rCounts?.[k] ?? 0))
+        rMinutes += c * R_KEY_MINUTES[k]
+      }
+
+      heartCount = Math.max(0, Number(memoObj?.heartCount ?? 0))
+      atCount = Math.max(0, Number(memoObj?.atCount ?? 0))
+      return { jMinutes, rMinutes, atCount, heartCount, tip, misuAmount }
+    }
+
+    if (memoObj.v === 2) {
+      const baseMinutes = Math.max(0, Number(memoObj?.baseMinutes ?? fallbackMinutes ?? 0))
+      const isRoom = Boolean(memoObj?.rSvc)
+      if (isRoom) rMinutes += baseMinutes
+      else jMinutes += baseMinutes
+
+      heartCount = memoObj?.heart ? 1 : 0
+      atCount = memoObj?.at ? 1 : 0
+      return { jMinutes, rMinutes, atCount, heartCount, tip, misuAmount }
+    }
+
+    if (memoObj.v === 1) {
+      const baseMinutes = inferLegacyMinutes(memoObj?.baseLabel, fallbackMinutes)
+      jMinutes += baseMinutes
+      heartCount = memoObj?.heart ? 1 : 0
+      atCount = memoObj?.at ? 1 : 0
+      return { jMinutes, rMinutes, atCount, heartCount, tip, misuAmount }
+    }
+  }
+
+  jMinutes += Math.max(0, Number(fallbackMinutes || 0))
+  return { jMinutes, rMinutes, atCount, heartCount, tip, misuAmount }
 }
 
+function inferLegacyMinutes(baseLabel: any, fallbackMinutes: number) {
+  const s = String(baseLabel ?? '')
+  if (s.includes('2개')) return 120
+  if (s.includes('1개반')) return 90
+  if (s.includes('1개')) return 60
+  if (s.includes('반개')) return 30
+  return Math.max(0, Number(fallbackMinutes || 0))
+}
+
+function buildSettleCompactText(memoObj: any, fallbackMinutes: number, fallbackMisuAmount: number) {
+  const { jMinutes, rMinutes, atCount, heartCount, tip, misuAmount } = extractCompactPartsFromMemo(memoObj, fallbackMinutes, fallbackMisuAmount)
+
+  const jText = formatHalfUnitText(jMinutes, '')
+  const rText = formatHalfUnitText(rMinutes, '룸')
+  const svcText = `${jText}${rText}`.trim() || '0개'
+  const addonText = `${repeatChar('@', atCount)}${repeatChar('♡', heartCount)}`
+  const misuMark = misuAmount > 0 ? '◼︎' : ''
+  const tipUnit = tip > 0 ? Math.round(tip / 1000) : 0
+  const tipText = tipUnit > 0 ? `(${tipUnit})` : ''
+
+  return `${svcText}${addonText}${misuMark}${tipText}`.trim()
+}
+
+/* ------------------ ✅ v4: 합산 + “미수까지만(◼︎까지)” ------------------ */
 function buildMisuOnlyText(args: { memoObj: any; misuAmount: number }) {
   const memoObj = args.memoObj
-  const misuMark = args.misuAmount > 0 ? '■■' : ''
+  const misuMark = args.misuAmount > 0 ? '◼︎' : ''
+
+  const tipRaw = memoObj && typeof memoObj === 'object' ? Number(memoObj?.tip ?? 0) : 0
+  const tip = Number.isFinite(tipRaw) ? Math.max(0, tipRaw) : 0
+  const tipUnit = tip > 0 ? Math.round(tip / 1000) : 0
+  const tipText = tipUnit > 0 ? `(${tipUnit})` : ''
 
   if (memoObj && typeof memoObj === 'object' && memoObj.v === 4 && Array.isArray(memoObj.steps)) {
     const steps = memoObj.steps as any[]
 
-    // ✅ “미수 step”까지만 표시
     const firstMisuIdx = steps.findIndex((s) => Boolean(s?.misu))
     const slice = firstMisuIdx >= 0 ? steps.slice(0, firstMisuIdx + 1) : steps
 
@@ -1318,27 +1324,27 @@ function buildMisuOnlyText(args: { memoObj: any; misuAmount: number }) {
 
     for (const s of slice) {
       const key = String(s?.key ?? '')
-      const mins = Math.max(0, Number(SVC_MINUTES[key] ?? 0))
       const kind = String(s?.kind ?? (key.startsWith('RT_') ? 'R' : 'J'))
-      if (kind === 'R') rMin += mins
-      else jMin += mins
+
+      if (kind === 'R') rMin += Math.max(0, Number(R_KEY_MINUTES[key] ?? 0))
+      else jMin += Math.max(0, Number(J_KEY_MINUTES[key] ?? 0))
 
       atCount += Math.max(0, Number(s?.at ?? 0))
       heartCount += Math.max(0, Number(s?.heart ?? 0))
     }
 
-    const jText = formatUnitsKo(jMin / 60, '')
-    const rText = formatUnitsKo(rMin / 60, '룸')
+    const jText = formatHalfUnitText(jMin, '')
+    const rText = formatHalfUnitText(rMin, '룸')
     const svcText = `${jText}${rText}`.trim()
     const addons = `${repeatChar('@', atCount)}${repeatChar('♡', heartCount)}`
-    return `${svcText}${addons}${misuMark}`.trim()
+
+    return `${svcText}${addons}${tipText}${misuMark}`.trim()
   }
 
-  // fallback
   const { qty, heartLike } = extractAggFromMemo(memoObj ?? {})
   const qtyText = qty > 0 ? `${qty}개` : ''
   const hearts = repeatChar('♡', heartLike)
-  return `${qtyText}${hearts}${misuMark}`.trim()
+  return `${qtyText}${hearts}${tipText}${misuMark}`.trim()
 }
 
 function numFromAny(v: any): number {
@@ -1593,6 +1599,7 @@ function deriveSettleLog(r: any, staffMap: Map<string, string>): SettleLog | nul
     misuAmount,
     cash,
     savedBy,
+    memoObj,
   }
 }
 
@@ -1614,18 +1621,9 @@ function addDaysYmd(ymd: string, delta: number) {
   return `${y}-${m}-${day}`
 }
 
-function getKstRangeIso7(startYmd: string, endYmd: string) {
-  const start = new Date(`${startYmd}T07:00:00+09:00`)
-  const end = new Date(`${endYmd}T07:00:00+09:00`)
+function getKstDayRangeIso7(dateYmd: string) {
+  const start = new Date(`${dateYmd}T07:00:00+09:00`)
+  const end = new Date(start)
   end.setDate(end.getDate() + 1)
   return { startIso: start.toISOString(), endIso: end.toISOString() }
-}
-
-function formatMinutes(mins: number) {
-  const m = Math.max(0, Number(mins || 0))
-  const h = Math.floor(m / 60)
-  const r = m % 60
-  if (h <= 0) return `${r}분`
-  if (r === 0) return `${h}시간`
-  return `${h}시간 ${r}분`
 }
