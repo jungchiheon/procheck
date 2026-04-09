@@ -1,134 +1,64 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react'
+import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import { supabaseClient } from '@/lib/supabaseClient'
 import { GlassCard } from '@/components/ui/GlassCard'
 import { PageHeader } from '@/components/ui/PageHeader'
-import { ProButton } from '@/components/ui/ProButton'
 import { cn } from '@/lib/cn'
 import { AdminNotificationBell } from '@/components/AdminNotificationBell'
-import { RefreshCcw, CheckCircle2, X, ChevronLeft, ChevronRight } from 'lucide-react'
+import { CheckCircle2, X, ChevronLeft, ChevronRight, Star } from 'lucide-react'
+import { ProButton } from '@/components/ui/ProButton'
+import { StaffListTab } from './_components/StaffListTab'
+import { fetchStaffListForAdmin } from './staff-admin.fetch'
+import type {
+  MisuItem,
+  SettleLog,
+  SettleProcessKey,
+  SettleProfileRow,
+  StaffAffiliation,
+  StaffGroup,
+  StaffRow,
+  StaffStatus,
+  SortMode,
+  TabKey,
+} from './staff-admin.types'
+import {
+  GROUP_ORDER,
+  MISU_CACHE_KEY,
+  MISU_CACHE_TTL_MS,
+  PAGE_CHUNK,
+  PREFETCH_TOP_N,
+  SETTLE_ALL_TTL,
+  SETTLE_PROCESS_LABEL,
+  SETTLE_PROCESS_OPTIONS,
+  STAFF_CACHE_KEY,
+  STAFF_CACHE_TTL_MS,
+  VISIT_KEY,
+} from './staff-admin.types'
+import {
+  addDaysYmd,
+  buildMisuOnlyText,
+  buildSettleLineFromMemo,
+  deriveSettleLog,
+  formatCurrency,
+  getKstDateString,
+  getKstRangeIso7,
+  idle,
+  isoToHm,
+  normalizeProcessKey,
+  normalizeStaffRows,
+  parseDayStatusMap,
+  parseMemoAny,
+  pickMisuBaseIso,
+  pickSavedByName,
+  ssRead,
+  ssWrite,
+  toKstDateStringAt7,
+} from './staff-admin.utils'
 
-type StaffStatus = 'WORKING' | 'CAR_WAIT' | 'LODGE_WAIT' | 'OFF' | 'CHOICE_ING' | 'CHOICE_DONE'
-/** 직원 소속 (에이원 / 고고) — DB `user_profiles.affiliation` */
-type StaffAffiliation = 'AONE' | 'GOGO'
-const AFFILIATION_LABEL: Record<StaffAffiliation, string> = {
-  AONE: '에이원',
-  GOGO: '고고',
-}
-
-type StaffGroup = 'ON' | 'OFF'
-type TabKey = 'staff' | 'misu' | 'settle'
-
-const GROUP_LABEL: Record<StaffGroup, string> = { ON: '출근', OFF: '퇴근' }
-const GROUP_ORDER: StaffGroup[] = ['ON', 'OFF']
 const groupRank = (g: StaffGroup) => GROUP_ORDER.indexOf(g)
-
-type StaffRow = {
-  id: string
-  login_id: string
-  nickname: string
-  last_checkin_at: string | null
-  last_checkout_at: string | null
-  work_status: StaffStatus | null
-  affiliation: StaffAffiliation | null
-}
-
-type SortMode = 'visit' | 'status'
-
-const VISIT_KEY = 'pc_admin_staff_last_visit_v1'
-const STAFF_CACHE_KEY = 'pc_admin_staff_rows_v2'
-const STAFF_CACHE_TTL_MS = 60 * 1000
-const PREFETCH_TOP_N = 6
-const PAGE_CHUNK = 40
-
-// 미수 캐시
-const MISU_CACHE_KEY = 'pc_admin_misu_rows_v1'
-const MISU_CACHE_TTL_MS = 30 * 1000
-
-type MisuItem = {
-  paymentId: number
-  staffId: string
-  staffNickname: string
-  workLogId: number | null
-  storeName: string
-  baseIso: string
-  ymd: string
-  lineText: string // ✅ “미수까지만” 표시 문자열
-  misuAmount: number
-  createdAt: string
-  memoObj: any
-  adminName: string | null
-}
-
-// 전체 정산 raw row
-type SettleLog = {
-  id: number
-  staffId: string
-  staffName: string
-  work_at: string
-  ts: number
-  timeText: string
-  storeName: string
-  minutes: number
-  storeTotal: number
-  staffPay: number
-  adminPay: number
-  tip: number
-  misu: boolean
-  misuAmount: number
-  cash: boolean
-  savedBy: string | null
-  memoObj: any
-}
-
-const SETTLE_ALL_TTL = 30 * 1000
-
-/** 정산 처리 상태 (일별 JSON `user_profiles.settlement_day_status[ymd]`) */
-type SettleProcessKey = 'PENDING' | 'DEPOSIT_DONE' | 'CASH_DONE'
-const SETTLE_PROCESS_LABEL: Record<SettleProcessKey, string> = {
-  PENDING: '처리전',
-  DEPOSIT_DONE: '입금완료',
-  CASH_DONE: '현금완료',
-}
-const SETTLE_PROCESS_OPTIONS: SettleProcessKey[] = ['PENDING', 'DEPOSIT_DONE', 'CASH_DONE']
-
-type SettleProfileRow = {
-  bank_name: string | null
-  bank_account: string | null
-  bank_holder: string | null
-  settlement_traits: string | null
-  settlement_day_status: Record<string, string> | null
-}
-
-function parseDayStatusMap(raw: unknown): Record<string, string> | null {
-  if (raw == null) return null
-  if (typeof raw === 'object' && !Array.isArray(raw)) return raw as Record<string, string>
-  if (typeof raw === 'string') {
-    try {
-      const p = JSON.parse(raw)
-      return typeof p === 'object' && p && !Array.isArray(p) ? (p as Record<string, string>) : null
-    } catch {
-      return null
-    }
-  }
-  return null
-}
-
-function normalizeProcessKey(v: string | undefined | null): SettleProcessKey {
-  if (v === 'DEPOSIT_DONE' || v === 'CASH_DONE' || v === 'PENDING') return v
-  return 'PENDING'
-}
-
-/** 직원 목록 — `affiliation` 컬럼이 없는 DB에서도 동작하도록 조회에 포함하지 않음(추가 후엔 여기에 affiliation 붙이면 됨) */
-function fetchStaffListForAdmin() {
-  return supabaseClient
-    .from('user_profiles')
-    .select('id, login_id, nickname, last_checkin_at, last_checkout_at, work_status')
-    .eq('role', 'staff')
-    .eq('is_active', true)
-}
 
 export default function AdminStaffPage() {
   const router = useRouter()
@@ -171,7 +101,6 @@ export default function AdminStaffPage() {
   const [settleRows, setSettleRows] = useState<SettleLog[]>([])
   const [settleProfiles, setSettleProfiles] = useState<Record<string, SettleProfileRow>>({})
   const [settleProfilesLoading, setSettleProfilesLoading] = useState(false)
-  const [starMenuStaffId, setStarMenuStaffId] = useState<string | null>(null)
   const [heartStaffId, setHeartStaffId] = useState<string | null>(null)
   const [heartStaffNickname, setHeartStaffNickname] = useState<string>('')
   const [misuConfirmItem, setMisuConfirmItem] = useState<MisuItem | null>(null)
@@ -329,6 +258,11 @@ export default function AdminStaffPage() {
     })
   }
 
+  const onStaffRowClick = (staffId: string) => {
+    startTransition(() => router.push(`/admin/staff/${staffId}`))
+    markVisitedIdle(staffId)
+  }
+
   // 직원 추가
   const onCreate = async () => {
     setError(null)
@@ -394,10 +328,11 @@ export default function AdminStaffPage() {
   const sectionTitleClass = (g: StaffGroup) => (g === 'ON' ? 'text-emerald-100' : 'text-red-100')
 
   /* ------------------------- 미수 관리 ------------------------- */
-  const loadMisu = async (opts?: { force?: boolean }) => {
+  const loadMisu = async (opts?: { force?: boolean; silent?: boolean }) => {
     const force = Boolean(opts?.force)
+    const silent = Boolean(opts?.silent)
 
-    if (!force) {
+    if (!force && !silent) {
       const cached = ssRead<{ ts: number; items: MisuItem[] }>(MISU_CACHE_KEY, MISU_CACHE_TTL_MS)
       if (cached?.items) {
         setMisuItems(cached.items)
@@ -405,8 +340,10 @@ export default function AdminStaffPage() {
       }
     }
 
-    setMisuError(null)
-    setMisuLoading(true)
+    if (!silent) {
+      setMisuError(null)
+      setMisuLoading(true)
+    }
 
     try {
       const { data: payRows, error: payErr } = await supabaseClient
@@ -523,9 +460,9 @@ export default function AdminStaffPage() {
       setMisuItems(items)
       ssWrite(MISU_CACHE_KEY, { ts: Date.now(), items })
     } catch (e: any) {
-      setMisuError(e?.message ?? '미수 조회 오류')
+      if (!silent) setMisuError(e?.message ?? '미수 조회 오류')
     } finally {
-      setMisuLoading(false)
+      if (!silent) setMisuLoading(false)
       setMisuSyncTick((t) => t + 1)
     }
   }
@@ -533,6 +470,28 @@ export default function AdminStaffPage() {
   useEffect(() => {
     if (tab !== 'misu') return
     loadMisu({ force: true }).catch(() => {})
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab])
+
+  /** payment_logs 변경 시 미수 목록 자동 갱신 */
+  useEffect(() => {
+    if (tab !== 'misu') return
+    let debounceId: number | null = null
+    const schedule = () => {
+      if (debounceId != null) window.clearTimeout(debounceId)
+      debounceId = window.setTimeout(() => {
+        debounceId = null
+        loadMisu({ force: true, silent: true }).catch(() => {})
+      }, 450)
+    }
+    const ch = supabaseClient
+      .channel('misu_rt_payment_logs')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'staff_payment_logs' }, schedule)
+      .subscribe()
+    return () => {
+      if (debounceId != null) window.clearTimeout(debounceId)
+      supabaseClient.removeChannel(ch)
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab])
 
@@ -589,13 +548,15 @@ export default function AdminStaffPage() {
   }
 
   /* ------------------------- 정산 탭 (하루 단위) ------------------------- */
-  const fetchSettlementDay = async (ymd: string) => {
+  const fetchSettlementDay = async (ymd: string, opts?: { skipCache?: boolean }) => {
     const { startIso, endIso } = getKstRangeIso7(ymd, ymd)
     const cacheKey = `pc_admin_settle_all_${ymd}_${ymd}_v2`
-    const cached = ssRead<{ ts: number; rows: SettleLog[] }>(cacheKey, SETTLE_ALL_TTL)?.rows ?? null
-    if (cached) {
-      setSettleRows(cached)
-      return
+    if (!opts?.skipCache) {
+      const cached = ssRead<{ ts: number; rows: SettleLog[] }>(cacheKey, SETTLE_ALL_TTL)?.rows ?? null
+      if (cached) {
+        setSettleRows(cached)
+        return
+      }
     }
 
     // staff_work_logs + staff_payment_logs join
@@ -640,15 +601,18 @@ export default function AdminStaffPage() {
     ssWrite(cacheKey, { ts: Date.now(), rows })
   }
 
-  const runSettlementDay = async (ymd: string) => {
-    setSettleError(null)
-    setSettleLoading(true)
+  const runSettlementDay = async (ymd: string, opts?: { silent?: boolean }) => {
+    const silent = Boolean(opts?.silent)
+    if (!silent) {
+      setSettleError(null)
+      setSettleLoading(true)
+    }
     try {
-      await fetchSettlementDay(ymd)
+      await fetchSettlementDay(ymd, { skipCache: true })
     } catch (e: any) {
       setSettleError(e?.message ?? '정산 조회 오류')
     } finally {
-      setSettleLoading(false)
+      if (!silent) setSettleLoading(false)
     }
   }
 
@@ -659,6 +623,29 @@ export default function AdminStaffPage() {
     runSettlementDay(today).catch(() => {})
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab])
+
+  /** work_logs / payment_logs 변경 시 정산 목록 자동 갱신(디바운스) */
+  useEffect(() => {
+    if (tab !== 'settle') return
+    let debounceId: number | null = null
+    const scheduleRefetch = () => {
+      if (debounceId != null) window.clearTimeout(debounceId)
+      debounceId = window.setTimeout(() => {
+        debounceId = null
+        runSettlementDay(settleYmd, { silent: true }).catch(() => {})
+      }, 450)
+    }
+    const ch = supabaseClient
+      .channel(`settle_rt_work_pay_${settleYmd}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'staff_work_logs' }, scheduleRefetch)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'staff_payment_logs' }, scheduleRefetch)
+      .subscribe()
+    return () => {
+      if (debounceId != null) window.clearTimeout(debounceId)
+      supabaseClient.removeChannel(ch)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab, settleYmd])
 
   const settleStaffBlocks = useMemo(() => {
     if (tab !== 'settle') return []
@@ -688,7 +675,7 @@ export default function AdminStaffPage() {
 
       const lines = b.logs.map((x) => {
         const timeHm = isoToHm(x.work_at)
-        const seq = buildSettleLineFromMemo(x.memoObj) // ✅ 쌓는 방식 반영 + ◼︎
+        const seq = buildSettleLineFromMemo(x.memoObj) // ✅ 쌓는 방식 반영 + □□
         return {
           id: `${x.staffId}_${x.id}`,
           storeName: x.storeName,
@@ -767,17 +754,6 @@ export default function AdminStaffPage() {
     loadSettleStaffProfiles(ids)
   }, [tab, settleRows, loadSettleStaffProfiles])
 
-  useEffect(() => {
-    if (!starMenuStaffId) return
-    const close = (e: MouseEvent) => {
-      const t = e.target as HTMLElement | null
-      if (t?.closest?.('[data-settle-star-wrap]')) return
-      setStarMenuStaffId(null)
-    }
-    document.addEventListener('mousedown', close)
-    return () => document.removeEventListener('mousedown', close)
-  }, [starMenuStaffId])
-
   const persistProcessStatus = async (staffId: string, ymd: string, status: SettleProcessKey) => {
     let cur: Record<string, string> = {}
     setSettleProfiles((p) => {
@@ -796,7 +772,6 @@ export default function AdminStaffPage() {
     })
     const { error } = await supabaseClient.from('user_profiles').update({ settlement_day_status: cur }).eq('id', staffId)
     if (error) throw new Error(error.message)
-    setStarMenuStaffId(null)
   }
 
   const flushHeartSave = useCallback(
@@ -932,7 +907,6 @@ export default function AdminStaffPage() {
 
   useEffect(() => {
     if (tab === 'settle') return
-    setStarMenuStaffId(null)
     if (heartStaffId) void closeHeartModal()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab])
@@ -1003,253 +977,100 @@ export default function AdminStaffPage() {
 
       {/* ------------------------- 직원 관리 탭 ------------------------- */}
       {tab === 'staff' && (
-        <>
-          <GlassCard className="p-5">
-            <div className="flex items-center justify-between gap-3">
-              <div className="text-white font-semibold tracking-tight">직원 목록</div>
-
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => setSortMode('visit')}
-                  className={cn(
-                    'rounded-lg px-3 py-1.5 text-sm border transition',
-                    sortMode === 'visit' ? 'bg-white text-zinc-900 border-white/0' : 'bg-white/5 text-white/80 border-white/12 hover:bg-white/10'
-                  )}
-                  type="button"
-                >
-                  변경순
-                </button>
-                <button
-                  onClick={() => setSortMode('status')}
-                  className={cn(
-                    'rounded-lg px-3 py-1.5 text-sm border transition',
-                    sortMode === 'status' ? 'bg-white text-zinc-900 border-white/0' : 'bg-white/5 text-white/80 border-white/12 hover:bg-white/10'
-                  )}
-                  type="button"
-                >
-                  상태순
-                </button>
-
-                <ProButton onClick={() => setOpen(true)} type="button" className={cn('!rounded-lg !px-3 !py-1.5 !text-sm !font-semibold !border')}>
-                  직원 추가
-                </ProButton>
-              </div>
-            </div>
-
-            <div className="mt-3">
-              {visible.length === 0 && <div className="py-5 text-sm text-white/60">{syncing ? '불러오는 중…' : '직원이 없습니다.'}</div>}
-
-              {GROUP_ORDER.map((g) => {
-                const arr = grouped.get(g) ?? []
-                if (arr.length === 0) return null
-
-                return (
-                  <div key={g} className="mt-4 first:mt-0">
-                    <div className="flex items-center justify-between">
-                      <div className={cn('text-sm font-semibold', sectionTitleClass(g))}>{GROUP_LABEL[g]}</div>
-                      <div className="text-xs text-white/40">{arr.length}명</div>
-                    </div>
-
-                    <div className="mt-2 divide-y divide-white/10 rounded-2xl border border-white/10 bg-black/10">
-                      {arr.map((s) => {
-                        return (
-                          <button
-                            key={s.id}
-                            onClick={() => {
-                              startTransition(() => router.push(`/admin/staff/${s.id}`))
-                              markVisitedIdle(s.id)
-                            }}
-                            className={cn('w-full text-left rounded-xl transition', 'px-3 py-3 hover:bg-white/5')}
-                            type="button"
-                            disabled={isPending}
-                          >
-                            <div className="min-w-0">
-                              <div className="text-white text-sm font-semibold truncate">{s.nickname}</div>
-                              <div className="mt-0.5 text-[11px] text-white/35 truncate">{s.login_id}</div>
-                              {s.affiliation && (
-                                <div className="mt-0.5 text-[11px] text-white/45">{AFFILIATION_LABEL[s.affiliation]}</div>
-                              )}
-                            </div>
-                          </button>
-                        )
-                      })}
-                    </div>
-                  </div>
-                )
-              })}
-
-              <div ref={sentinelRef} className="h-8" />
-            </div>
-          </GlassCard>
-
-          {/* 직원 추가 모달 */}
-          {open && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center p-6">
-              <button className="absolute inset-0 bg-black/60" onClick={() => setOpen(false)} type="button" aria-label="닫기" />
-              <div className="relative w-full max-w-md">
-                <GlassCard className="p-6">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <div className="text-white text-lg font-semibold">직원 추가</div>
-                      <div className="mt-1 text-sm text-white/55">로그인ID/비밀번호/닉네임/소속</div>
-                    </div>
-                    <button
-                      onClick={() => setOpen(false)}
-                      className="rounded-xl border border-white/12 bg-white/5 p-2 text-white/80 hover:bg-white/10 transition"
-                      type="button"
-                      aria-label="닫기"
-                    >
-                      <X className="h-4 w-4" />
-                    </button>
-                  </div>
-
-                  <div className="mt-5 space-y-4">
-                    <div>
-                      <label className="text-sm font-medium text-white/80">로그인ID</label>
-                      <input
-                        className="mt-2 w-full rounded-xl border border-white/12 bg-black/20 px-3 py-2.5 text-white outline-none placeholder:text-white/30 focus:border-white/25"
-                        value={loginId}
-                        onChange={(e) => setLoginId(e.target.value)}
-                        placeholder="staff03"
-                        autoComplete="off"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="text-sm font-medium text-white/80">비밀번호</label>
-                      <input
-                        type="password"
-                        className="mt-2 w-full rounded-xl border border-white/12 bg-black/20 px-3 py-2.5 text-white outline-none placeholder:text-white/30 focus:border-white/25"
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        placeholder="••••••••"
-                        autoComplete="new-password"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="text-sm font-medium text-white/80">닉네임</label>
-                      <input
-                        className="mt-2 w-full rounded-xl border border-white/12 bg-black/20 px-3 py-2.5 text-white outline-none placeholder:text-white/30 focus:border-white/25"
-                        value={nickname}
-                        onChange={(e) => setNickname(e.target.value)}
-                        placeholder="직원3"
-                        autoComplete="off"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="text-sm font-medium text-white/80">소속</label>
-                      <div className="mt-2 grid grid-cols-2 gap-2">
-                        {(['AONE', 'GOGO'] as const).map((key) => (
-                          <button
-                            key={key}
-                            type="button"
-                            onClick={() => setCreateAffiliation(key)}
-                            className={cn(
-                              'rounded-xl border px-3 py-2.5 text-sm font-semibold transition',
-                              createAffiliation === key
-                                ? 'bg-white text-zinc-900 border-white/0'
-                                : 'bg-white/5 text-white/85 border-white/12 hover:bg-white/10'
-                            )}
-                          >
-                            {AFFILIATION_LABEL[key]}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div className="pt-2 flex gap-2">
-                      <ProButton variant="ghost" className="flex-1" onClick={() => setOpen(false)} type="button">
-                        취소
-                      </ProButton>
-                      <ProButton className="flex-1" onClick={onCreate} disabled={creating} type="button">
-                        {creating ? '생성 중...' : '생성'}
-                      </ProButton>
-                    </div>
-                  </div>
-                </GlassCard>
-              </div>
-            </div>
-          )}
-        </>
+        <StaffListTab
+          syncing={syncing}
+          visible={visible}
+          grouped={grouped}
+          sortMode={sortMode}
+          setSortMode={setSortMode}
+          sentinelRef={sentinelRef}
+          onStaffClick={onStaffRowClick}
+          isPending={isPending}
+          sectionTitleClass={sectionTitleClass}
+          open={open}
+          setOpen={setOpen}
+          loginId={loginId}
+          setLoginId={setLoginId}
+          password={password}
+          setPassword={setPassword}
+          nickname={nickname}
+          setNickname={setNickname}
+          createAffiliation={createAffiliation}
+          setCreateAffiliation={setCreateAffiliation}
+          onCreate={onCreate}
+          creating={creating}
+        />
       )}
 
       {/* ------------------------- 미수 관리 탭 ------------------------- */}
       {tab === 'misu' && (
-        <GlassCard className="p-5">
-          <div className="flex items-center justify-between gap-3">
-            <div className="text-white font-semibold tracking-tight">미수 내역</div>
-
-            <div className="flex items-center gap-3">
-              <div className="text-xs text-white/60">
-                총 {misuTotal.count}건 · {formatCurrency(misuTotal.sum)}원
-              </div>
-
-              <button
-                type="button"
-                onClick={() => loadMisu({ force: true })}
-                className={cn(
-                  'inline-flex items-center gap-2',
-                  'h-9 px-3 rounded-xl border border-white/12 bg-white/5',
-                  'text-sm font-semibold text-white/85 hover:bg-white/10 transition',
-                  misuLoading && 'opacity-70 cursor-not-allowed'
-                )}
-                disabled={misuLoading}
-              >
-                <RefreshCcw className={cn('h-4 w-4', misuLoading && 'animate-spin')} />
-                새로고침
-              </button>
+        <>
+        <GlassCard className="overflow-hidden p-0">
+          <div className="border-b border-white/10 bg-black/25 px-4 py-4 sm:px-5">
+            <div className="text-lg font-bold tracking-tight text-white">미수</div>
+            <div className="mt-1 flex flex-wrap items-baseline gap-x-3 gap-y-1 text-sm text-white/55">
+              <span className="tabular-nums">
+                <span className="font-semibold text-white/90">{misuTotal.count}</span>건
+              </span>
+              <span className="text-white/30">·</span>
+              <span className="tabular-nums font-semibold text-amber-200/90">{formatCurrency(misuTotal.sum)}원</span>
             </div>
+            <p className="mt-2 text-xs leading-snug text-white/40">저장·정산 반영 시 자동으로 맞춰집니다.</p>
           </div>
 
-          {misuError && (
-            <div className="mt-4 rounded-xl border border-red-400/30 bg-red-500/10 px-4 py-3 text-sm text-red-100">{misuError}</div>
-          )}
+          <div className="space-y-4 px-4 py-4 sm:px-5">
+            {misuError && (
+              <div className="rounded-2xl border border-red-400/35 bg-red-500/15 px-4 py-3 text-sm font-medium text-red-100">{misuError}</div>
+            )}
 
-          <div className="mt-4">
-            {misuLoading && <div className="py-6 text-sm text-white/60">불러오는 중...</div>}
-            {!misuLoading && misuByDay.length === 0 && <div className="py-6 text-sm text-white/60">미수 내역이 없습니다.</div>}
+            {misuLoading && (
+              <div className="py-12 text-center text-base text-white/55">불러오는 중…</div>
+            )}
+            {!misuLoading && misuByDay.length === 0 && (
+              <div className="py-12 text-center text-base text-white/55">미수 내역이 없습니다.</div>
+            )}
 
             {!misuLoading &&
               misuByDay.map((day) => (
-                <div key={day.ymd} className="mb-4">
-                  <div className="flex items-end justify-between gap-3">
-                    <div className="text-white font-semibold">{day.ymd}</div>
-                    <div className="text-xs text-white/60">
-                      {day.count}건 · {formatCurrency(day.sum)}원
+                <div
+                  key={day.ymd}
+                  className="rounded-2xl border border-white/12 bg-gradient-to-b from-white/[0.06] to-black/25 p-4 shadow-lg ring-1 ring-black/20"
+                >
+                  <div className="flex items-end justify-between gap-3 border-b border-white/10 pb-3">
+                    <span className="text-xl font-bold tabular-nums text-white">{day.ymd}</span>
+                    <div className="text-right text-sm text-white/55">
+                      <span className="font-semibold tabular-nums text-white/85">{day.count}</span>건 ·{' '}
+                      <span className="font-semibold tabular-nums text-amber-200/90">{formatCurrency(day.sum)}원</span>
                     </div>
                   </div>
 
-                  <div className="mt-2 divide-y divide-white/10 rounded-2xl border border-white/10 bg-black/10">
+                  <div className="mt-3 space-y-3">
                     {day.items.map((it) => (
-                      <div key={it.paymentId} className="px-4 py-3">
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="min-w-0">
-                            {/* ✅ 맨위: 직원/가게/시간 */}
-                            <div className="text-sm text-white font-semibold truncate">
-                              {it.staffNickname} / {it.storeName} / {isoToHm(it.baseIso || it.createdAt)}
+                      <div
+                        key={it.paymentId}
+                        className="rounded-xl border border-white/10 bg-black/30 p-3.5 sm:p-4"
+                      >
+                        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+                          <div className="min-w-0 flex-1 space-y-2">
+                            <div className="text-base font-bold text-white">{it.staffNickname}</div>
+                            <div className="text-sm font-medium text-white/75">
+                              <span className="break-words">{it.storeName}</span>
+                              <span className="tabular-nums text-white/50"> · {isoToHm(it.baseIso || it.createdAt)}</span>
                             </div>
-
-                            {/* ✅ 저장한 관리자 */}
-                            <div className="mt-0.5 text-[11px] text-white/45 truncate">{it.adminName ? `저장: ${it.adminName}` : '-'}</div>
-
-                            {/* ✅ 맨밑줄: 합산+미수까지만(◼︎까지) */}
-                            <div className="mt-1 text-xs text-white/70 truncate">{it.lineText}</div>
+                            <div className="text-xs text-white/40">{it.adminName ? `저장 ${it.adminName}` : '저장 —'}</div>
+                            <div className="text-sm leading-relaxed text-white/65 break-words">{it.lineText}</div>
                           </div>
-
-                          <div className="shrink-0 text-right">
-                            <div className="text-sm text-white/85 font-semibold">{formatCurrency(it.misuAmount)}원</div>
+                          <div className="flex shrink-0 flex-col gap-2 sm:w-36 sm:items-end">
+                            <div className="text-lg font-bold tabular-nums text-white sm:text-right">{formatCurrency(it.misuAmount)}원</div>
                             <button
                               type="button"
                               onClick={() => setMisuConfirmItem(it)}
                               className={cn(
-                                'mt-2 inline-flex items-center gap-1.5',
-                                'rounded-xl border border-emerald-300/30 bg-emerald-500/10',
-                                'px-3 py-1.5 text-[12px] font-semibold text-emerald-100 hover:bg-emerald-500/15 transition'
+                                'inline-flex min-h-[48px] w-full items-center justify-center gap-2 rounded-xl border border-emerald-400/35',
+                                'bg-emerald-500/15 px-4 text-sm font-bold text-emerald-100 shadow-sm hover:bg-emerald-500/25 active:scale-[0.98] transition sm:w-full'
                               )}
                             >
-                              <CheckCircle2 className="h-4 w-4" />
+                              <CheckCircle2 className="h-5 w-5 shrink-0" />
                               정산 완료
                             </button>
                           </div>
@@ -1260,230 +1081,198 @@ export default function AdminStaffPage() {
                 </div>
               ))}
           </div>
+        </GlassCard>
 
-          {/* 미수 정산 완료 확인 */}
-          {misuConfirmItem && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        {/* body 포털: 레이아웃 transform/filter와 무관하게 뷰포트에 고정 (목록 아래에 붙는 현상 방지) */}
+        {misuConfirmItem &&
+          typeof document !== 'undefined' &&
+          createPortal(
+            <div className="fixed inset-0 z-[200] overflow-y-auto">
               <button
                 type="button"
-                className="absolute inset-0 bg-black/70 backdrop-blur-sm"
+                className="absolute inset-0 bg-black/65 backdrop-blur-sm"
                 aria-label="닫기"
                 onClick={() => !misuConfirmLoading && setMisuConfirmItem(null)}
               />
-              <div className="relative w-full max-w-sm">
-                <div
-                  className={cn(
-                    'relative rounded-2xl border border-white/15 p-6 pt-7 shadow-2xl',
-                    'bg-zinc-950 text-white'
-                  )}
-                >
-                  <button
-                    type="button"
-                    disabled={misuConfirmLoading}
-                    onClick={() => setMisuConfirmItem(null)}
-                    className="absolute right-4 top-4 rounded-xl border border-white/12 bg-white/5 p-2 text-white/70 hover:bg-white/10 transition disabled:opacity-50"
-                    aria-label="닫기"
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
-                  <div className="flex items-start gap-3 pr-10">
-                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-emerald-500/15 text-emerald-200 ring-1 ring-emerald-400/20">
-                      <CheckCircle2 className="h-6 w-6" />
+              <div className="relative z-[1] mx-auto flex min-h-[100dvh] w-full max-w-sm items-center justify-center p-4">
+                <div className="w-full rounded-xl border border-white/12 bg-zinc-950 p-4 text-white shadow-2xl">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <div className="text-base font-bold">정산 완료</div>
+                      <p className="mt-1 text-xs text-white/50">미수 목록에서 제거합니다.</p>
                     </div>
-                    <div>
-                      <h2 className="text-lg font-semibold tracking-tight">미수 정산 완료</h2>
-                      <p className="mt-1 text-sm text-white/50 leading-relaxed">
-                        아래 내역을 정산 완료로 처리할까요? 완료 후 목록에서 사라집니다.
-                      </p>
-                    </div>
-                  </div>
-                  <div className="mt-5 space-y-2 rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-sm">
-                    <div className="flex justify-between gap-2">
-                      <span className="text-white/45">직원</span>
-                      <span className="font-medium text-white text-right truncate">{misuConfirmItem.staffNickname}</span>
-                    </div>
-                    <div className="flex justify-between gap-2">
-                      <span className="text-white/45">가게</span>
-                      <span className="font-medium text-white text-right truncate">{misuConfirmItem.storeName}</span>
-                    </div>
-                    <div className="flex justify-between gap-2 border-t border-white/10 pt-2 mt-2">
-                      <span className="text-white/45">미수 금액</span>
-                      <span className="text-lg font-semibold text-emerald-200">{formatCurrency(misuConfirmItem.misuAmount)}원</span>
-                    </div>
-                  </div>
-                  <div className="mt-6 flex gap-2">
                     <button
                       type="button"
                       disabled={misuConfirmLoading}
                       onClick={() => setMisuConfirmItem(null)}
-                      className="flex-1 rounded-xl border border-white/15 bg-white/5 py-3 text-sm font-semibold text-white/85 hover:bg-white/10 transition disabled:opacity-50"
+                      className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white/5 text-white/70 hover:bg-white/10 disabled:opacity-50"
+                      aria-label="닫기"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                  <p className="mt-3 truncate text-sm text-white/80" title={`${misuConfirmItem.staffNickname} · ${misuConfirmItem.storeName}`}>
+                    {misuConfirmItem.staffNickname} · {misuConfirmItem.storeName}
+                  </p>
+                  <p className="mt-1 text-lg font-bold tabular-nums text-emerald-300">{formatCurrency(misuConfirmItem.misuAmount)}원</p>
+                  <div className="mt-4 flex gap-2">
+                    <button
+                      type="button"
+                      disabled={misuConfirmLoading}
+                      onClick={() => setMisuConfirmItem(null)}
+                      className="flex-1 min-h-11 rounded-lg border border-white/12 bg-white/5 text-sm font-semibold text-white/90 hover:bg-white/10 disabled:opacity-50"
                     >
                       취소
                     </button>
                     <button
                       type="button"
                       disabled={misuConfirmLoading}
-                      onClick={() => confirmMisuDone()}
-                      className="flex-1 rounded-xl bg-emerald-500 py-3 text-sm font-semibold text-zinc-950 hover:bg-emerald-400 transition disabled:opacity-60"
+                      onClick={() => void confirmMisuDone()}
+                      className="flex-1 min-h-11 rounded-lg bg-emerald-500 text-sm font-semibold text-zinc-950 hover:bg-emerald-400 disabled:opacity-60"
                     >
-                      {misuConfirmLoading ? '처리 중…' : '정산 완료'}
+                      {misuConfirmLoading ? '처리 중…' : '완료'}
                     </button>
                   </div>
                 </div>
               </div>
-            </div>
+            </div>,
+            document.body
           )}
-        </GlassCard>
+        </>
       )}
 
-      {/* ------------------------- 정산 탭 ------------------------- */}
+      {/* ------------------------- 정산 탭 (모바일·터치 우선) ------------------------- */}
       {tab === 'settle' && (
-        <GlassCard className="p-5">
-          <div className="flex items-center justify-between gap-3">
-            <div className="text-white font-semibold tracking-tight">정산</div>
+        <GlassCard className="overflow-hidden p-0">
+          <div className="border-b border-white/10 bg-black/25 px-4 py-4 sm:px-5">
+            <div className="min-w-0">
+              <div className="text-lg font-bold tracking-tight text-white">정산</div>
+              <div className="mt-1 text-xs leading-snug text-white/50">07:00 ~ 다음날 07:00 · 내역은 저장 시 자동 반영</div>
+              {settleProfilesLoading && <div className="mt-1 text-[11px] text-amber-200/70">직원 계좌·상태 동기화 중…</div>}
+            </div>
 
-            <div className="flex items-center gap-3">
-              {settleProfilesLoading && <span className="text-xs text-white/40">직원 정보 로드…</span>}
+            <div className="mt-4 flex items-stretch gap-2">
               <button
                 type="button"
-                onClick={() => runSettlementDay(settleYmd)}
-                className={cn(
-                  'inline-flex items-center gap-2',
-                  'h-9 px-3 rounded-xl border border-white/12 bg-white/5',
-                  'text-sm font-semibold text-white/85 hover:bg-white/10 transition',
-                  settleLoading && 'opacity-70 cursor-not-allowed'
-                )}
-                disabled={settleLoading}
+                onClick={() => {
+                  const prev = addDaysYmd(settleYmd, -1)
+                  setSettleYmd(prev)
+                  runSettlementDay(prev).catch(() => {})
+                }}
+                className="inline-flex min-h-[56px] min-w-[56px] shrink-0 items-center justify-center rounded-2xl border border-white/15 bg-white/10 text-white shadow-sm hover:bg-white/15 active:scale-[0.98] transition"
+                aria-label="전날"
               >
-                <RefreshCcw className={cn('h-4 w-4', settleLoading && 'animate-spin')} />
-                새로고침
+                <ChevronLeft className="h-7 w-7" strokeWidth={2.5} />
+              </button>
+
+              <div className="flex min-h-[56px] flex-1 flex-col items-center justify-center rounded-2xl border border-white/12 bg-black/35 px-2 py-2">
+                <span className="text-xl font-bold tabular-nums tracking-tight text-white">{settleYmd}</span>
+                {settleYmd !== getKstDateString() && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const t = getKstDateString()
+                      setSettleYmd(t)
+                      runSettlementDay(t).catch(() => {})
+                    }}
+                    className="mt-1 rounded-lg bg-emerald-500/20 px-3 py-1 text-xs font-bold text-emerald-200 ring-1 ring-emerald-400/30 active:scale-[0.98]"
+                  >
+                    오늘로
+                  </button>
+                )}
+              </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  const next = addDaysYmd(settleYmd, +1)
+                  setSettleYmd(next)
+                  runSettlementDay(next).catch(() => {})
+                }}
+                className="inline-flex min-h-[56px] min-w-[56px] shrink-0 items-center justify-center rounded-2xl border border-white/15 bg-white/10 text-white shadow-sm hover:bg-white/15 active:scale-[0.98] transition"
+                aria-label="다음날"
+              >
+                <ChevronRight className="h-7 w-7" strokeWidth={2.5} />
               </button>
             </div>
           </div>
 
-          <div className="mt-2 text-sm text-white/55">기준 : 07:00 ~ 다음날 07:00</div>
+          <div className="space-y-4 px-4 py-4 sm:px-5">
+            {settleError && (
+              <div className="rounded-2xl border border-red-400/35 bg-red-500/15 px-4 py-3 text-sm font-medium text-red-100">{settleError}</div>
+            )}
 
-          {/* ✅ 날짜 네비 (전날/다음날) */}
-          <div className="mt-4 flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => {
-                const prev = addDaysYmd(settleYmd, -1)
-                setSettleYmd(prev)
-                runSettlementDay(prev).catch(() => {})
-              }}
-              className="h-9 w-9 inline-flex items-center justify-center rounded-xl border border-white/12 bg-white/5 text-white/80 hover:bg-white/10 transition"
-              aria-label="전날"
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </button>
-
-            <div className="text-white font-semibold">{settleYmd}</div>
-
-            <button
-              type="button"
-              onClick={() => {
-                const next = addDaysYmd(settleYmd, +1)
-                setSettleYmd(next)
-                runSettlementDay(next).catch(() => {})
-              }}
-              className="h-9 w-9 inline-flex items-center justify-center rounded-xl border border-white/12 bg-white/5 text-white/80 hover:bg-white/10 transition"
-              aria-label="다음날"
-            >
-              <ChevronRight className="h-4 w-4" />
-            </button>
-          </div>
-
-          {settleError && (
-            <div className="mt-4 rounded-xl border border-red-400/30 bg-red-500/10 px-4 py-3 text-sm text-red-100">{settleError}</div>
-          )}
-
-          <div className="mt-5">
-            {settleLoading && <div className="py-6 text-sm text-white/60">정산 내역 불러오는 중...</div>}
-            {!settleLoading && settleStaffBlocks.length === 0 && <div className="py-6 text-sm text-white/60">해당 날짜에 내역이 없습니다.</div>}
+            {settleLoading && (
+              <div className="py-10 text-center text-base text-white/55">정산 내역 불러오는 중…</div>
+            )}
+            {!settleLoading && settleStaffBlocks.length === 0 && (
+              <div className="py-10 text-center text-base text-white/55">해당 날짜에 내역이 없습니다.</div>
+            )}
 
             {!settleLoading &&
               settleStaffBlocks.map((b) => {
                 const dayMap = settleProfiles[b.staffId]?.settlement_day_status
                 const proc = normalizeProcessKey(dayMap?.[settleYmd])
                 return (
-                  <div key={b.staffId} className="mb-4">
-                    {/* ✅ 직원별 헤더 + 처리상태(⭐) + 처리여부 + 계좌/특징(♥) */}
-                    <div className="flex flex-wrap items-end justify-between gap-3 gap-y-2">
-                      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 min-w-0">
-                        <div className="text-white font-semibold shrink-0">
-                          {b.staffName} {b.staffUnit}
+                  <div
+                    key={b.staffId}
+                    className="rounded-2xl border border-white/12 bg-gradient-to-b from-white/[0.07] to-black/25 p-4 shadow-lg ring-1 ring-black/20"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                          <span className="text-xl font-bold text-white">{b.staffName}</span>
+                          <span className="text-lg font-semibold tabular-nums text-amber-200/95">{b.staffUnit}</span>
                         </div>
-
-                        <div className="relative" data-settle-star-wrap>
-                          <button
-                            type="button"
-                            title="처리 상태"
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              setStarMenuStaffId((prev) => (prev === b.staffId ? null : b.staffId))
-                            }}
-                            className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-white/12 bg-white/5 text-base leading-none hover:bg-white/10 transition"
-                          >
-                            ⭐
-                          </button>
-                          {starMenuStaffId === b.staffId && (
-                            <div
-                              className="absolute left-0 top-full z-30 mt-1 min-w-[9rem] rounded-xl border border-white/12 bg-zinc-950/98 py-1 shadow-xl backdrop-blur"
-                              data-settle-star-wrap
-                            >
-                              {SETTLE_PROCESS_OPTIONS.map((key) => (
-                                <button
-                                  key={key}
-                                  type="button"
-                                  className={cn(
-                                    'block w-full px-3 py-2 text-left text-sm font-medium transition',
-                                    proc === key ? 'bg-white/15 text-white' : 'text-white/85 hover:bg-white/10'
-                                  )}
-                                  onClick={() => {
-                                    persistProcessStatus(b.staffId, settleYmd, key).catch((err) =>
-                                      setSettleError((err as Error)?.message ?? '처리 상태 저장 실패')
-                                    )
-                                  }}
-                                >
-                                  {SETTLE_PROCESS_LABEL[key]}
-                                </button>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-
-                        <div className="flex items-center gap-1.5 text-xs">
-                          <span className="text-white/40">처리여부</span>
-                          <span className="font-semibold text-white/90">{SETTLE_PROCESS_LABEL[proc]}</span>
-                        </div>
-
-                        <button
-                          type="button"
-                          title="정산 계좌"
-                          onClick={() => openHeartForStaff(b.staffId, b.staffName)}
-                          className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-white/12 bg-white/5 text-base leading-none hover:bg-white/10 transition"
-                        >
-                          ♥
-                        </button>
-
+                        <div className="mt-1.5 text-sm font-semibold tabular-nums text-white/60">{formatCurrency(b.adminPaySum)}원</div>
                       </div>
-
-                      <div className="text-xs text-white/70 shrink-0">{formatCurrency(b.adminPaySum)}원</div>
+                      <button
+                        type="button"
+                        title="정산 계좌·메모"
+                        onClick={() => openHeartForStaff(b.staffId, b.staffName)}
+                        className="inline-flex min-h-[52px] min-w-[52px] shrink-0 items-center justify-center rounded-2xl border border-amber-400/35 bg-amber-500/10 text-amber-100 shadow-inner hover:bg-amber-500/20 active:scale-[0.97] transition"
+                        aria-label="정산 계좌"
+                      >
+                        <Star className="h-6 w-6 fill-amber-400/35" strokeWidth={1.75} />
+                      </button>
                     </div>
 
-                    {/* ✅ 직원별 work log 리스트 */}
-                    <div className="mt-2 divide-y divide-white/10 rounded-2xl border border-white/10 bg-black/10">
-                      {b.lines.map((ln) => (
-                        <div key={ln.id} className="px-4 py-3">
-                          <div className="flex items-start justify-between gap-3">
-                            <div className="min-w-0">
-                              <div className="text-sm text-white/85 font-semibold truncate">
-                                {ln.storeName} {ln.timeHm}
-                              </div>
-                              <div className="mt-1 text-xs text-white/70 truncate">{ln.seq}</div>
-                            </div>
+                    <div className="mt-4 grid grid-cols-3 gap-2">
+                      {SETTLE_PROCESS_OPTIONS.map((key) => {
+                        const active = proc === key
+                        return (
+                          <button
+                            key={key}
+                            type="button"
+                            className={cn(
+                              'min-h-[52px] rounded-xl border px-1.5 py-2 text-center text-[11px] font-bold leading-tight transition sm:text-xs',
+                              active
+                                ? 'border-emerald-400/55 bg-emerald-500/25 text-emerald-50 shadow-[inset_0_1px_0_rgba(255,255,255,0.12)]'
+                                : 'border-white/12 bg-white/5 text-white/80 hover:bg-white/10 active:scale-[0.98]'
+                            )}
+                            onClick={() => {
+                              persistProcessStatus(b.staffId, settleYmd, key).catch((err) =>
+                                setSettleError((err as Error)?.message ?? '처리 상태 저장 실패')
+                              )
+                            }}
+                          >
+                            {SETTLE_PROCESS_LABEL[key]}
+                          </button>
+                        )
+                      })}
+                    </div>
+
+                    <div className="mt-3 overflow-hidden rounded-xl border border-white/10 bg-black/30">
+                      {b.lines.map((ln, idx) => (
+                        <div
+                          key={ln.id}
+                          className={cn('px-3 py-3.5 sm:px-4 sm:py-4', idx > 0 && 'border-t border-white/8')}
+                        >
+                          <div className="text-base font-semibold leading-snug text-white">
+                            <span className="break-words">{ln.storeName}</span>{' '}
+                            <span className="tabular-nums text-white/75">{ln.timeHm}</span>
                           </div>
+                          <div className="mt-2 text-sm leading-relaxed text-white/70 break-words">{ln.seq}</div>
                         </div>
                       ))}
                     </div>
@@ -1492,7 +1281,7 @@ export default function AdminStaffPage() {
               })}
           </div>
 
-          {/* ♥ 정산 계좌 (실시간 저장) */}
+          {/* 별: 정산 계좌 (실시간 저장) */}
           {heartStaffId && heartDraft && (
             <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
               <button
@@ -1516,18 +1305,18 @@ export default function AdminStaffPage() {
                     <button
                       type="button"
                       onClick={() => closeHeartModal()}
-                      className="shrink-0 rounded-xl border border-white/12 bg-white/10 p-2 text-white/80 hover:bg-white/15 transition"
+                      className="inline-flex min-h-[48px] min-w-[48px] shrink-0 items-center justify-center rounded-2xl border border-white/12 bg-white/10 text-white/90 hover:bg-white/15 active:scale-[0.98] transition"
                       aria-label="닫기"
                     >
-                      <X className="h-4 w-4" />
+                      <X className="h-6 w-6" />
                     </button>
                   </div>
 
                   <div className="mt-5 space-y-4">
                     <div>
-                      <label className="text-sm font-medium text-white/80">은행명</label>
+                      <label className="text-base font-semibold text-white/85">은행명</label>
                       <input
-                        className="mt-2 w-full rounded-xl border border-white/12 bg-zinc-900 px-3 py-2.5 text-white outline-none placeholder:text-white/30 focus:border-white/25"
+                        className="mt-2 min-h-[52px] w-full rounded-xl border border-white/12 bg-zinc-900 px-4 py-3 text-base text-white outline-none placeholder:text-white/30 focus:border-white/25"
                         value={heartDraft.bank_name}
                         onChange={(e) => {
                           const next = { ...heartDraft, bank_name: e.target.value }
@@ -1539,9 +1328,9 @@ export default function AdminStaffPage() {
                       />
                     </div>
                     <div>
-                      <label className="text-sm font-medium text-white/80">예금주</label>
+                      <label className="text-base font-semibold text-white/85">예금주</label>
                       <input
-                        className="mt-2 w-full rounded-xl border border-white/12 bg-zinc-900 px-3 py-2.5 text-white outline-none placeholder:text-white/30 focus:border-white/25"
+                        className="mt-2 min-h-[52px] w-full rounded-xl border border-white/12 bg-zinc-900 px-4 py-3 text-base text-white outline-none placeholder:text-white/30 focus:border-white/25"
                         value={heartDraft.bank_holder}
                         onChange={(e) => {
                           const next = { ...heartDraft, bank_holder: e.target.value }
@@ -1553,9 +1342,9 @@ export default function AdminStaffPage() {
                       />
                     </div>
                     <div>
-                      <label className="text-sm font-medium text-white/80">계좌번호</label>
+                      <label className="text-base font-semibold text-white/85">계좌번호</label>
                       <input
-                        className="mt-2 w-full rounded-xl border border-white/12 bg-zinc-900 px-3 py-2.5 text-white outline-none placeholder:text-white/30 focus:border-white/25"
+                        className="mt-2 min-h-[52px] w-full rounded-xl border border-white/12 bg-zinc-900 px-4 py-3 text-base text-white outline-none placeholder:text-white/30 focus:border-white/25"
                         value={heartDraft.bank_account}
                         onChange={(e) => {
                           const next = { ...heartDraft, bank_account: e.target.value }
@@ -1567,9 +1356,9 @@ export default function AdminStaffPage() {
                       />
                     </div>
                     <div>
-                      <label className="text-sm font-medium text-white/80">메모</label>
+                      <label className="text-base font-semibold text-white/85">메모</label>
                       <textarea
-                        className="mt-2 w-full min-h-[140px] rounded-xl border border-white/12 bg-zinc-900 px-3 py-3 text-base text-white leading-relaxed outline-none placeholder:text-white/30 focus:border-white/25 resize-y"
+                        className="mt-2 min-h-[160px] w-full rounded-xl border border-white/12 bg-zinc-900 px-4 py-4 text-base text-white leading-relaxed outline-none placeholder:text-white/30 focus:border-white/25 resize-y"
                         value={heartDraft.settlement_traits}
                         onChange={(e) => {
                           const next = { ...heartDraft, settlement_traits: e.target.value }
@@ -1589,419 +1378,4 @@ export default function AdminStaffPage() {
       )}
     </div>
   )
-}
-
-/* ------------------------- utils ------------------------- */
-function normalizeStaffRows(data: unknown): StaffRow[] {
-  const arr = Array.isArray(data) ? data : []
-  return arr
-    .map((r: any) => {
-      const row: StaffRow = {
-        id: String(r?.id ?? ''),
-        login_id: String(r?.login_id ?? ''),
-        nickname: String(r?.nickname ?? ''),
-        last_checkin_at: r?.last_checkin_at ?? null,
-        last_checkout_at: r?.last_checkout_at ?? null,
-        work_status: (r?.work_status ?? null) as any,
-        affiliation: (r?.affiliation === 'AONE' || r?.affiliation === 'GOGO' ? r.affiliation : null) as StaffAffiliation | null,
-      }
-      if (!row.id) return null
-      return row
-    })
-    .filter((x): x is StaffRow => Boolean(x))
-}
-
-function ssRead<T>(key: string, ttlMs: number): T | null {
-  try {
-    const raw = sessionStorage.getItem(key)
-    if (!raw) return null
-    const parsed = JSON.parse(raw)
-    const ts = Number((parsed as any)?.ts ?? 0)
-    if (!ts || Date.now() - ts > ttlMs) return null
-    return parsed as T
-  } catch {
-    return null
-  }
-}
-
-function ssWrite(key: string, value: any) {
-  idle(() => {
-    try {
-      sessionStorage.setItem(key, JSON.stringify(value))
-    } catch {}
-  })
-}
-
-function idle(fn: () => void) {
-  if (typeof (window as any).requestIdleCallback === 'function') {
-    ;(window as any).requestIdleCallback(fn, { timeout: 800 })
-  } else {
-    window.setTimeout(fn, 0)
-  }
-}
-
-function parseMemoAny(memo: string | null) {
-  if (!memo) return null
-  try {
-    const obj = JSON.parse(memo)
-    if (!obj || typeof obj !== 'object') return null
-    return obj
-  } catch {
-    return null
-  }
-}
-
-// ✅ memo에서 저장한 관리자 이름 추출
-function pickSavedByName(memoObj: any): string | null {
-  if (!memoObj || typeof memoObj !== 'object') return null
-  const cand =
-    memoObj?.savedBy?.nickname ||
-    memoObj?.savedBy?.name ||
-    memoObj?.saved_by?.nickname ||
-    memoObj?.adminNickname ||
-    memoObj?.admin_name ||
-    memoObj?.admin?.nickname ||
-    memoObj?.admin?.name
-  return typeof cand === 'string' && cand.trim() ? cand.trim() : null
-}
-
-function isoToHm(iso: string) {
-  const d = new Date(iso)
-  if (!Number.isFinite(d.getTime())) return ''
-  return d.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false })
-}
-
-// 선택일 07:00 기준 날짜로 변환
-function toKstDateStringAt7(iso: string) {
-  const d = new Date(iso)
-  const hh = d.getHours()
-  const base = new Date(d)
-  if (hh < 7) base.setDate(base.getDate() - 1)
-  const y = base.getFullYear()
-  const m = String(base.getMonth() + 1).padStart(2, '0')
-  const day = String(base.getDate()).padStart(2, '0')
-  return `${y}-${m}-${day}`
-}
-
-/* ------------------ ✅ v5 tokens 기반 표시 (핵심) ------------------ */
-/**
- * v5 예시:
- * memoObj.v === 5
- * memoObj.tokens = [
- *   {t:'J', key:'J_ONE'}, {t:'R', key:'RT_ONE'}, {t:'TIP', amount:100000}, {t:'MISU'},
- *   {t:'J', key:'J_ONE_HALF'}, ...
- * ]
- *
- * - ◼︎ 은 {t:'MISU'} 시점
- * - 팁은 {t:'TIP'} 시점에 (amount/1000) 표시
- * - 미수관리: “첫 ◼︎ 까지”만 보여야 함
- */
-const SVC_MINUTES: Record<string, number> = { J_HALF: 30, J_ONE: 60, J_ONE_HALF: 90, J_TWO: 120, RT_HALF: 30, RT_ONE: 60 }
-
-function buildMisuOnlyText(args: { memoObj: any; misuAmount: number }) {
-  const memoObj = args.memoObj
-  const misuMark = args.misuAmount > 0 ? '◼︎' : ''
-
-  // ✅ v5 tokens 우선
-  if (memoObj && typeof memoObj === 'object' && memoObj.v === 5 && Array.isArray(memoObj.tokens)) {
-    const tokens = memoObj.tokens as any[]
-    const misuIdx = tokens.findIndex((x) => x?.t === 'MISU')
-    const slice = misuIdx >= 0 ? tokens.slice(0, misuIdx + 1) : tokens
-
-    // 1) 서비스/룸 합산 (표시는 합산)
-    let jMin = 0
-    let rMin = 0
-
-    // 2) addon 합산 (표시는 뒤에)
-    let hearts = 0
-    let ats = 0
-
-    // 3) tip tokens (표시는 “시점” 유지: MISU 이전이면 ◼︎ 앞, 이후면 ◼︎ 뒤인데
-    //    미수관리에서는 “◼︎까지 slice”만 보니까 => tip은 무조건 ◼︎ 앞/혹은 ◼︎ 직전에 있어야 함
-    //    단, slice 내부에 TIP이 여러 번이면 합산해서 하나로 표기
-    let tipUnitSum = 0
-
-    for (const t of slice) {
-      if (!t) continue
-      if (t.t === 'J') jMin += Math.max(0, Number(SVC_MINUTES[String(t.key)] ?? 0))
-      if (t.t === 'R') rMin += Math.max(0, Number(SVC_MINUTES[String(t.key)] ?? 0))
-      if (t.t === 'HEART') hearts += 1
-      if (t.t === 'AT') ats += 1
-      if (t.t === 'TIP') {
-        const amt = Math.max(0, Number(t.amount ?? 0))
-        tipUnitSum += Math.round(amt / 1000)
-      }
-    }
-
-    const svc = `${formatUnitsKo(jMin / 60, '')}${formatUnitsKo(rMin / 60, '룸')}`.trim()
-    const addons = `${repeatChar('@', ats)}${repeatChar('♡', hearts)}`
-    const tipText = tipUnitSum > 0 ? `(${tipUnitSum})` : ''
-
-    // ✅ 미수관리: tip은 “미수 버튼 누르기 전”에 들어온 것만 slice에 존재 => ◼︎ 앞
-    return `${svc}${addons}${tipText}${misuMark}`.trim()
-  }
-
-  // ✅ v4 fallback (기존 steps): “미수 step 까지” 합산
-  if (memoObj && typeof memoObj === 'object' && memoObj.v === 4 && Array.isArray(memoObj.steps)) {
-    const steps = memoObj.steps as any[]
-    const firstMisuIdx = steps.findIndex((s) => Boolean(s?.misu))
-    const slice = firstMisuIdx >= 0 ? steps.slice(0, firstMisuIdx + 1) : steps
-
-    let jMin = 0
-    let rMin = 0
-    let atCount = 0
-    let heartCount = 0
-
-    for (const s of slice) {
-      const key = String(s?.key ?? '')
-      const mins = Math.max(0, Number(SVC_MINUTES[key] ?? 0))
-      const kind = String(s?.kind ?? (key.startsWith('RT_') ? 'R' : 'J'))
-      if (kind === 'R') rMin += mins
-      else jMin += mins
-
-      atCount += Math.max(0, Number(s?.at ?? 0))
-      heartCount += Math.max(0, Number(s?.heart ?? 0))
-    }
-
-    const tipRaw = Number(memoObj?.tip ?? 0)
-    const tipUnit = tipRaw > 0 ? Math.round(Math.max(0, tipRaw) / 1000) : 0
-    const tipText = tipUnit > 0 ? `(${tipUnit})` : ''
-
-    const svcText = `${formatUnitsKo(jMin / 60, '')}${formatUnitsKo(rMin / 60, '룸')}`.trim()
-    const addons = `${repeatChar('@', atCount)}${repeatChar('♡', heartCount)}`
-    return `${svcText}${addons}${tipText}${misuMark}`.trim()
-  }
-
-  // fallback (구형 memo)
-  const tipRaw = memoObj && typeof memoObj === 'object' ? Number(memoObj?.tip ?? 0) : 0
-  const tipUnit = tipRaw > 0 ? Math.round(Math.max(0, tipRaw) / 1000) : 0
-  const tipText = tipUnit > 0 ? `(${tipUnit})` : ''
-  return `${tipText}${misuMark}`.trim()
-}
-
-// ✅ 정산 탭 개별 라인(서비스/룸 합산 + addon + (tip) + ◼︎) : “쌓는 방식” 반영
-function buildSettleLineFromMemo(memoObj: any) {
-  if (!memoObj || typeof memoObj !== 'object') return '-'
-
-  // v5 tokens 우선
-  if (memoObj.v === 5 && Array.isArray(memoObj.tokens)) {
-    const tokens = memoObj.tokens as any[]
-
-    // “미수 여부/팁 시점”이 tokens에 있으므로, 표시도 tokens 순서를 반영하되
-    // 네가 요구한 정산 표기는 “합산 후 뒤에 addon, 그 다음 tip/미수 위치는 시점대로”
-    let jMin = 0
-    let rMin = 0
-    let hearts = 0
-    let ats = 0
-
-    // tip은 “미수 전/후”를 위해 분리 합산
-    let tipBeforeUnit = 0
-    let tipAfterUnit = 0
-
-    const misuIdx = tokens.findIndex((x) => x?.t === 'MISU')
-
-    for (let i = 0; i < tokens.length; i++) {
-      const t = tokens[i]
-      if (!t) continue
-      if (t.t === 'J') jMin += Math.max(0, Number(SVC_MINUTES[String(t.key)] ?? 0))
-      if (t.t === 'R') rMin += Math.max(0, Number(SVC_MINUTES[String(t.key)] ?? 0))
-      if (t.t === 'HEART') hearts += 1
-      if (t.t === 'AT') ats += 1
-      if (t.t === 'TIP') {
-        const amt = Math.max(0, Number(t.amount ?? 0))
-        const u = Math.round(amt / 1000)
-        if (misuIdx >= 0 && i > misuIdx) tipAfterUnit += u
-        else tipBeforeUnit += u
-      }
-    }
-
-    const svc = `${formatUnitsKo(jMin / 60, '')}${formatUnitsKo(rMin / 60, '룸')}`.trim()
-    const addons = `${repeatChar('@', ats)}${repeatChar('♡', hearts)}`
-    const before = tipBeforeUnit > 0 ? `(${tipBeforeUnit})` : ''
-    const after = tipAfterUnit > 0 ? `(${tipAfterUnit})` : ''
-    const misuMark = misuIdx >= 0 ? '◼︎' : ''
-
-    // ✅ 규칙: tip이 미수 전이면 ◼︎ 앞, 미수 후면 ◼︎ 뒤
-    return `${svc}${addons}${before}${misuMark}${after}`.trim()
-  }
-
-  // v4 fallback (기존 memo)
-  const tipRaw = Math.max(0, Number(memoObj?.tip ?? 0))
-  const tipUnit = tipRaw > 0 ? Math.round(tipRaw / 1000) : 0
-  const tipText = tipUnit > 0 ? `(${tipUnit})` : ''
-  const misuMark = memoObj?.misu ? '◼︎' : ''
-  // v4에서는 “시점”이 없으니: 항상 ◼︎ 앞에 붙여버림(기존 데이터용)
-  return `${tipText}${misuMark}`.trim() || '-'
-}
-
-function repeatChar(ch: string, n: number) {
-  const k = Math.max(0, Number(n || 0))
-  if (k <= 0) return ''
-  return new Array(k).fill(ch).join('')
-}
-
-const NUM_KO: Record<number, string> = { 1: '한', 2: '두', 3: '세', 4: '네', 5: '다섯', 6: '여섯', 7: '일곱', 8: '여덟', 9: '아홉', 10: '열' }
-function numToKo(n: number) {
-  return NUM_KO[n] ?? String(n)
-}
-function formatUnitsKo(units: number, prefix: '' | '룸') {
-  const u = Math.round((Number.isFinite(units) ? units : 0) * 2) / 2
-  if (u <= 0) return ''
-  const intPart = Math.floor(u)
-  const hasHalf = u - intPart >= 0.5
-
-  if (intPart === 0 && hasHalf) return prefix ? `${prefix}반개` : '반개'
-  if (!hasHalf) return prefix ? `${prefix}${numToKo(intPart)}개` : `${numToKo(intPart)}개`
-  return prefix ? `${prefix}${numToKo(intPart)}개반` : `${numToKo(intPart)}개반`
-}
-
-function numFromAny(v: any): number {
-  const n = Number(v)
-  if (Number.isFinite(n)) return n
-  if (typeof v === 'string') {
-    const m = v.match(/(\d+)/)
-    if (m) return Number(m[1])
-  }
-  return 0
-}
-
-function toBool(v: any) {
-  if (typeof v === 'boolean') return v
-  if (typeof v === 'number') return v === 1
-  if (typeof v === 'string') {
-    const s = v.trim().toLowerCase()
-    return s === '1' || s === 'true' || s === 'y' || s === 'yes' || s === 't'
-  }
-  return Boolean(v)
-}
-
-function pickMisuBaseIso(memoObj: any, createdAt: string) {
-  const cands = [
-    memoObj?.misuAt,
-    memoObj?.misu_at,
-    memoObj?.misuCreatedAt,
-    memoObj?.misu_created_at,
-    memoObj?.misuDateTime,
-    memoObj?.misu_datetime,
-    memoObj?.misuTime,
-    memoObj?.misu_time,
-    memoObj?.misuDate,
-    memoObj?.misu_date,
-    memoObj?.misuInputAt,
-    memoObj?.misu_input_at,
-  ]
-  for (const v of cands) {
-    const s = typeof v === 'string' ? v : null
-    if (!s) continue
-    const t = new Date(s).getTime()
-    if (Number.isFinite(t) && t > 0) return s
-  }
-  return createdAt
-}
-
-function formatCurrency(n: number) {
-  const v = Number(n ?? 0)
-  if (!Number.isFinite(v)) return '0'
-  return v.toLocaleString('ko-KR')
-}
-
-/* ---- settlement helpers ---- */
-function safeJson(s: string | null) {
-  if (!s) return null
-  try {
-    return JSON.parse(s)
-  } catch {
-    return null
-  }
-}
-
-function deriveSettleLog(r: any, staffMap: Map<string, string>): SettleLog | null {
-  const id = Number(r?.id ?? 0)
-  const staffId = String(r?.staff_id ?? '')
-  const work_at = String(r?.work_at ?? '')
-  if (!id || !staffId || !work_at) return null
-
-  const ts = new Date(work_at).getTime()
-  if (!Number.isFinite(ts)) return null
-
-  const staffName = staffMap.get(staffId) ?? '직원'
-  const storeName =
-    r?.stores?.name != null
-      ? String(r.stores.name)
-      : r?.stores?.[0]?.name
-        ? String(r.stores[0].name)
-        : '가게 미지정'
-
-  const payRaw = Array.isArray(r?.staff_payment_logs) ? r.staff_payment_logs[0] : null
-  const memoStr: string | null = payRaw?.memo ?? null
-  const memoObj = safeJson(memoStr)
-
-  const minutes = Math.max(0, Number(r?.minutes ?? 0))
-
-  let storeTotal = 0
-  let staffPay = Math.max(0, Number(payRaw?.amount ?? 0))
-  let adminPay = 0
-  let tip = 0
-  let misu = false
-  let misuAmount = 0
-  let cash = false
-
-  const savedBy = pickSavedByName(memoObj)
-
-  if (memoObj && typeof memoObj === 'object') {
-    storeTotal = Math.max(0, Number((memoObj as any).storeTotal ?? 0))
-    staffPay = Math.max(0, Number((memoObj as any).staffPay ?? staffPay ?? 0))
-    adminPay = Math.max(0, Number((memoObj as any).adminPay ?? 0))
-    tip = Math.max(0, Number((memoObj as any).tip ?? 0))
-    misu = Boolean((memoObj as any).misu)
-    misuAmount = Math.max(0, Number((memoObj as any).misuAmount ?? 0))
-    cash = Boolean((memoObj as any).cash)
-  }
-
-  const timeText = new Date(work_at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false })
-
-  return {
-    id,
-    staffId,
-    staffName,
-    work_at,
-    ts,
-    timeText,
-    storeName,
-    minutes,
-    storeTotal,
-    staffPay,
-    adminPay,
-    tip,
-    misu,
-    misuAmount,
-    cash,
-    savedBy,
-    memoObj,
-  }
-}
-
-/* ---- date/time helpers ---- */
-function getKstDateString() {
-  const d = new Date()
-  const y = d.getFullYear()
-  const m = String(d.getMonth() + 1).padStart(2, '0')
-  const day = String(d.getDate()).padStart(2, '0')
-  return `${y}-${m}-${day}`
-}
-
-function addDaysYmd(ymd: string, delta: number) {
-  const d = new Date(`${ymd}T00:00:00+09:00`)
-  d.setDate(d.getDate() + delta)
-  const y = d.getFullYear()
-  const m = String(d.getMonth() + 1).padStart(2, '0')
-  const day = String(d.getDate()).padStart(2, '0')
-  return `${y}-${m}-${day}`
-}
-
-function getKstRangeIso7(startYmd: string, endYmd: string) {
-  const start = new Date(`${startYmd}T07:00:00+09:00`)
-  const end = new Date(`${endYmd}T07:00:00+09:00`)
-  end.setDate(end.getDate() + 1)
-  return { startIso: start.toISOString(), endIso: end.toISOString() }
 }

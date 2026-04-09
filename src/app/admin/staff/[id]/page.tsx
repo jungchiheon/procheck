@@ -8,6 +8,8 @@ import { PageHeader } from '@/components/ui/PageHeader'
 import { ProButton } from '@/components/ui/ProButton'
 import { cn } from '@/lib/cn'
 import { Star, Save, Trash2, ChevronLeft, ChevronRight, X, UserCheck } from 'lucide-react'
+import { MISU_MARK } from '../staff-admin.types'
+import { v5DisplayLineFromTokens } from '../staff-admin.utils'
 
 /* ------------------------- types ------------------------- */
 type StaffStatus = 'WORKING' | 'CAR_WAIT' | 'LODGE_WAIT' | 'OFF' | 'CHOICE_ING' | 'CHOICE_DONE'
@@ -161,7 +163,8 @@ type Token =
   | { t: 'HEART' }
   | { t: 'AT' }
   | { t: 'TIP'; amount: number } // +amount (원)
-  | { t: 'MISU' } // 구분선(◼︎)
+  | { t: 'MISU' } // 구분선(□□)
+  | { t: 'CASH' } // 현금(이후 토큰은 2줄·순차 표기)
 
 type MemoV5 = {
   v: 5
@@ -261,7 +264,6 @@ export default function AdminStaffDetailPage() {
 
   // ✅ v5 tokens
   const [tokens, setTokens] = useState<Token[]>([])
-  const [cash, setCash] = useState(false)
   const [saving, setSaving] = useState(false)
 
   // 계좌 모달
@@ -341,11 +343,26 @@ export default function AdminStaffDetailPage() {
     pushToken({ t: 'TIP', amount: a })
   }
 
-  // ✅ 미수: 구분선 1개만 허용(원하면 reset)
-  const addMisuSplit = () => {
-    const idx = tokens.findIndex((x) => x.t === 'MISU')
-    if (idx >= 0) return setError('미수(◼︎)는 한 번만 가능합니다. 필요하면 전체초기화 후 다시 입력하세요.')
-    pushToken({ t: 'MISU' })
+  /** 미수: 토글(없으면 추가 / 있으면 첫 MISU 제거) — 왔다갔다 입력 가능 */
+  const toggleMisuSplit = () => {
+    setError(null)
+    setMessage(null)
+    setTokens((p) => {
+      const i = p.findIndex((x) => x.t === 'MISU')
+      if (i >= 0) return [...p.slice(0, i), ...p.slice(i + 1)]
+      return [...p, { t: 'MISU' }]
+    })
+  }
+
+  /** 현금: 토큰 1개(순서 기준). 다시 누르면 제거 */
+  const toggleCashToken = () => {
+    setError(null)
+    setMessage(null)
+    setTokens((p) => {
+      const i = p.findIndex((x) => x.t === 'CASH')
+      if (i >= 0) return [...p.slice(0, i), ...p.slice(i + 1)]
+      return [...p, { t: 'CASH' }]
+    })
   }
 
   const resetAll = () => {
@@ -356,7 +373,6 @@ export default function AdminStaffDetailPage() {
     setStoreDropdownOpen(false)
     setWorkTime(getTimeHHMM())
     setTokens([])
-    setCash(false)
   }
 
   /* ------------------------- calc (tokens -> amounts + display) ------------------------- */
@@ -378,6 +394,7 @@ export default function AdminStaffDetailPage() {
       let admin = 0
 
       for (const t of seg) {
+        if (t.t === 'CASH' || t.t === 'MISU') continue
         if (t.t === 'J') {
           const svc = J_SVC[t.key]
           jMin += svc.minutes
@@ -432,12 +449,7 @@ export default function AdminStaffDetailPage() {
     const misuAmount = misuIdx >= 0 ? Math.max(0, b.store) : 0
     const misu = misuAmount > 0
 
-    // ✅ 표시 문자열: “before(팁포함)◼︎ after(팁포함)”
-    // - tip 위치: token 시점대로 이미 before/after에 귀속됨
-    const line =
-      misuIdx >= 0
-        ? `${b.display}${b.display ? '' : ''}◼︎${a.display ? ` ${a.display}` : ''}`.trim()
-        : `${b.display}`.trim()
+    const line = v5DisplayLineFromTokens(tokens as unknown[])
 
     // baseLabel(저장용): 보기좋게 (서비스/룸만)
     const baseLabel = buildBaseLabelFromTokens(tokens)
@@ -691,7 +703,7 @@ export default function AdminStaffDetailPage() {
       const memoObj: MemoV5 = {
         v: 5,
         tokens: tokens.map((t) => normalizeToken(t)),
-        cash,
+        cash: tokens.some((t) => t.t === 'CASH'),
         minutes: calc.minutes,
         staffPay: calc.staffPay,
         adminPay: calc.adminPay,
@@ -723,7 +735,6 @@ export default function AdminStaffDetailPage() {
 
       // reset input
       setTokens([])
-      setCash(false)
     } catch (e: any) {
       setError(e?.message ?? '저장 오류')
     } finally {
@@ -1083,11 +1094,13 @@ export default function AdminStaffDetailPage() {
             <CountButton label="@" count={badgeCounts.AT} onInc={incAt} onDec={decAt} />
             <GridButton onClick={() => setTokens((p) => p.filter((x) => x.t !== 'TIP'))}>팁초기화</GridButton>
 
-            <GridButton active={cash} onClick={() => setCash((p) => !p)}>
+            <GridButton active={tokens.some((t) => t.t === 'CASH')} onClick={toggleCashToken}>
               현금
             </GridButton>
 
-            <GridButton onClick={addMisuSplit}>미수(◼︎)</GridButton>
+            <GridButton active={tokens.some((t) => t.t === 'MISU')} onClick={toggleMisuSplit}>
+              미수({MISU_MARK})
+            </GridButton>
 
             <GridButton onClick={resetAll}>전체초기화</GridButton>
           </div>
@@ -1097,7 +1110,7 @@ export default function AdminStaffDetailPage() {
         <div className="mt-4 rounded-2xl border border-white/10 bg-white/5 p-4">
           <div className="text-sm text-white/50">정산 요약</div>
 
-          <div className="mt-1 text-white font-semibold whitespace-nowrap overflow-hidden text-ellipsis" title={calc.line}>
+          <div className="mt-1 text-white font-semibold whitespace-pre-line break-words" title={calc.line}>
             {calc.line || '-'}
           </div>
 
@@ -1179,7 +1192,7 @@ export default function AdminStaffDetailPage() {
                       {d.timeText} · {d.storeName}
                     </div>
                     <div className="mt-0.5 text-[11px] text-white/45 truncate">저장: {d.savedByName ?? '-'}</div>
-                    <div className="mt-1 text-xs text-white/70 truncate">{d.displayLine}</div>
+                    <div className="mt-1 text-xs text-white/70 whitespace-pre-line break-words line-clamp-4">{d.displayLine}</div>
                   </div>
 
                   <div className="shrink-0 text-right">
@@ -1527,7 +1540,7 @@ function deriveLog(w: WorkLogRow): DerivedLog | null {
   // ✅ v5(tokens) 표시
   if (memo && memo.v === 5) {
     const m = memo as MemoV5
-    const line = buildDisplayFromV5(m.tokens)
+    const line = v5DisplayLineFromTokens(m.tokens as unknown[])
     return {
       id: w.id,
       work_at: w.work_at,
@@ -1539,7 +1552,7 @@ function deriveLog(w: WorkLogRow): DerivedLog | null {
       staffPay: Number(m.staffPay || 0),
       adminPay: Number(m.adminPay || 0),
       tip: Number(m.tipTotal || 0),
-      cash: Boolean(m.cash),
+      cash: Boolean(m.cash) || (Array.isArray(m.tokens) && m.tokens.some((t) => (t as Token).t === 'CASH')),
       misu: Boolean(m.misu),
       misuAmount: Number(m.misuAmount || 0),
       savedByName: pickSavedByNameFromMemo(m),
@@ -1570,41 +1583,8 @@ function deriveLog(w: WorkLogRow): DerivedLog | null {
 function normalizeToken(t: Token): Token {
   // 저장 안전성(숫자 정리 등)
   if (t.t === 'TIP') return { t: 'TIP', amount: Math.max(0, Math.floor(Number(t.amount || 0))) }
+  if (t.t === 'CASH') return { t: 'CASH' }
   return t
-}
-
-// ✅ v5 표시: “합산(서비스/룸) + addon + tip 시점 + ◼︎”
-function buildDisplayFromV5(tokens: Token[]) {
-  const misuIdx = tokens.findIndex((x) => x.t === 'MISU')
-  const before = misuIdx >= 0 ? tokens.slice(0, misuIdx) : tokens
-  const after = misuIdx >= 0 ? tokens.slice(misuIdx + 1) : []
-
-  const segText = (seg: Token[]) => {
-    let jMin = 0
-    let rMin = 0
-    let hearts = 0
-    let ats = 0
-    let tipTotal = 0
-
-    for (const t of seg) {
-      if (t.t === 'J') jMin += J_SVC[t.key].minutes
-      if (t.t === 'R') rMin += R_SVC[t.key].minutes
-      if (t.t === 'HEART') hearts += 1
-      if (t.t === 'AT') ats += 1
-      if (t.t === 'TIP') tipTotal += Math.max(0, Number(t.amount || 0))
-    }
-
-    const svc = `${formatUnitsKo(jMin / 60, '')}${formatUnitsKo(rMin / 60, '룸')}`.trim()
-    const addons = `${repeatChar('@', ats)}${repeatChar('♡', hearts)}`
-    const tipUnit = tipTotal > 0 ? Math.round(tipTotal / 1000) : 0
-    const tipText = tipUnit > 0 ? `(${tipUnit})` : ''
-    return `${svc}${addons}${tipText}`.trim()
-  }
-
-  const b = segText(before)
-  const a = segText(after)
-  if (misuIdx < 0) return b || '-'
-  return `${b}◼︎${a ? ` ${a}` : ''}`.trim()
 }
 
 function buildBaseLabelFromTokens(tokens: Token[]) {
@@ -1612,6 +1592,7 @@ function buildBaseLabelFromTokens(tokens: Token[]) {
   let jMin = 0
   let rMin = 0
   for (const t of tokens) {
+    if (t.t === 'MISU' || t.t === 'CASH') continue
     if (t.t === 'J') jMin += J_SVC[t.key].minutes
     if (t.t === 'R') rMin += R_SVC[t.key].minutes
   }
