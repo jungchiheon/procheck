@@ -5,10 +5,14 @@ import { createClient } from '@supabase/supabase-js'
 // 1-1) 런타임 고정(서버에서만 실행)
 export const runtime = 'nodejs'
 
+/** 소속: 에이원 / 고고 (DB `user_profiles.affiliation`) */
+type StaffAffiliation = 'AONE' | 'GOGO'
+
 type Body = {
   loginId: string
   password: string
   nickname: string
+  affiliation: StaffAffiliation
 }
 
 export async function POST(req: Request) {
@@ -70,10 +74,14 @@ export async function POST(req: Request) {
     const loginId = (body.loginId || '').trim()
     const password = body.password || ''
     const nickname = (body.nickname || '').trim()
+    const affiliation = body.affiliation
 
     if (!loginId) return NextResponse.json({ error: '1-6) loginId required' }, { status: 400 })
     if (!password) return NextResponse.json({ error: '1-6) password required' }, { status: 400 })
     if (!nickname) return NextResponse.json({ error: '1-6) nickname required' }, { status: 400 })
+    if (affiliation !== 'AONE' && affiliation !== 'GOGO') {
+      return NextResponse.json({ error: '1-6) 소속(에이원/고고)을 선택하세요.' }, { status: 400 })
+    }
 
     // 1-7) loginId 안전 필터(원하면 규칙 완화 가능)
     const normalized = loginId.toLowerCase()
@@ -111,8 +119,8 @@ export async function POST(req: Request) {
 
     const newUserId = created.user.id
 
-    // 1-11) user_profiles 생성
-    const { error: insErr } = await supabaseService.from('user_profiles').insert({
+    // 1-11) user_profiles 생성 (affiliation 컬럼 없으면 소속 없이 insert)
+    const baseRow = {
       id: newUserId,
       login_id: normalized,
       nickname,
@@ -120,7 +128,21 @@ export async function POST(req: Request) {
       is_active: true,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
-    })
+    }
+
+    let savedAffiliation: StaffAffiliation | null = affiliation
+
+    let insErr = (
+      await supabaseService.from('user_profiles').insert({
+        ...baseRow,
+        affiliation,
+      })
+    ).error
+
+    if (insErr && String(insErr.message).toLowerCase().includes('affiliation')) {
+      insErr = (await supabaseService.from('user_profiles').insert(baseRow)).error
+      savedAffiliation = null
+    }
 
     if (insErr) {
       // 1-11-1) 프로필 insert 실패 시 Auth 유저 롤백(정리)
@@ -128,10 +150,16 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: `1-11) profile insert failed: ${insErr.message}` }, { status: 500 })
     }
 
-    // 1-12) 성공 응답
+    // 1-12) 성공 응답 (affiliation 컬럼 없이 저장된 경우 savedAffiliation 은 null)
     return NextResponse.json({
       ok: true,
-      staff: { id: newUserId, login_id: normalized, nickname, role: 'staff' },
+      staff: {
+        id: newUserId,
+        login_id: normalized,
+        nickname,
+        role: 'staff',
+        affiliation: savedAffiliation,
+      },
     })
   } catch (e: any) {
     return NextResponse.json({ error: e?.message ?? 'unexpected error' }, { status: 500 })

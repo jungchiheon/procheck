@@ -50,13 +50,32 @@ export async function GET(
       return NextResponse.json({ error: '1-6) not admin' }, { status: 403 })
     }
 
-    // 1-7) 직원 프로필 조회
-    const { data: staff, error: staffErr } = await admin
-      .from('user_profiles')
-.select('id, login_id, nickname, role, is_active, last_checkin_at, last_checkout_at, bank_name, bank_account, bank_holder, attendance_status')
+    // 1-7) 직원 프로필 조회 (affiliation 컬럼 없는 DB 호환: 먼저 확장 select → 실패 시 기본 컬럼만)
+    let staff: Record<string, unknown> | null = null
+    let staffErr: { message: string } | null = null
 
+    const full = await admin
+      .from('user_profiles')
+      .select(
+        'id, login_id, nickname, role, is_active, last_checkin_at, last_checkout_at, bank_name, bank_account, bank_holder, attendance_status, work_status, affiliation'
+      )
       .eq('id', staffId)
       .maybeSingle()
+
+    if (full.error && String(full.error.message).toLowerCase().includes('affiliation')) {
+      const basic = await admin
+        .from('user_profiles')
+        .select(
+          'id, login_id, nickname, role, is_active, last_checkin_at, last_checkout_at, bank_name, bank_account, bank_holder, attendance_status, work_status'
+        )
+        .eq('id', staffId)
+        .maybeSingle()
+      staff = basic.data as Record<string, unknown> | null
+      staffErr = basic.error
+    } else {
+      staff = full.data as Record<string, unknown> | null
+      staffErr = full.error
+    }
 
     if (staffErr) throw new Error(`1-7) staff query failed: ${staffErr.message}`)
     if (!staff) return NextResponse.json({ error: '1-7) staff not found' }, { status: 404 })
