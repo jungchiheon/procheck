@@ -8,7 +8,7 @@ import { GlassCard } from '@/components/ui/GlassCard'
 import { PageHeader } from '@/components/ui/PageHeader'
 import { cn } from '@/lib/cn'
 import { AdminNotificationBell } from '@/components/AdminNotificationBell'
-import { CheckCircle2, X, ChevronLeft, ChevronRight, Star } from 'lucide-react'
+import { CheckCircle2, X, ChevronLeft, ChevronRight, Star, Circle } from 'lucide-react'
 import { ProButton } from '@/components/ui/ProButton'
 import { StaffListTab } from './_components/StaffListTab'
 import { fetchStaffListForAdmin } from './staff-admin.fetch'
@@ -41,8 +41,11 @@ import {
   addDaysYmd,
   buildMisuOnlyText,
   buildSettleLineFromMemo,
+  buildSettleStaffHeaderLine,
   deriveSettleLog,
   formatCurrency,
+  formatMoneyDotThousands,
+  formatTimeKoHm,
   getKstDateString,
   getKstRangeIso7,
   idle,
@@ -101,6 +104,11 @@ export default function AdminStaffPage() {
   const [settleRows, setSettleRows] = useState<SettleLog[]>([])
   const [settleProfiles, setSettleProfiles] = useState<Record<string, SettleProfileRow>>({})
   const [settleProfilesLoading, setSettleProfilesLoading] = useState(false)
+  const [settleProcessPicker, setSettleProcessPicker] = useState<{
+    staffId: string
+    staffName: string
+    current: SettleProcessKey
+  } | null>(null)
   const [heartStaffId, setHeartStaffId] = useState<string | null>(null)
   const [heartStaffNickname, setHeartStaffNickname] = useState<string>('')
   const [misuConfirmItem, setMisuConfirmItem] = useState<MisuItem | null>(null)
@@ -672,14 +680,17 @@ export default function AdminStaffPage() {
 
       // ✅ 직원 표시 금액: 1000원당 1
       const staffUnit = Math.round(staffPaySum / 1000)
+      const cashStaffPay = b.logs.reduce((s, x) => s + (x.cash ? x.staffPay : 0), 0)
+      const nonCashStaffPay = b.logs.reduce((s, x) => s + (!x.cash ? x.staffPay : 0), 0)
+      const cashUnits = Math.round(cashStaffPay / 1000)
+      const nonCashUnits = Math.round(nonCashStaffPay / 1000)
 
       const lines = b.logs.map((x) => {
-        const timeHm = isoToHm(x.work_at)
         const seq = buildSettleLineFromMemo(x.memoObj) // ✅ 쌓는 방식 반영 + □□
         return {
           id: `${x.staffId}_${x.id}`,
           storeName: x.storeName,
-          timeHm,
+          timeKo: formatTimeKoHm(x.work_at),
           seq,
         }
       })
@@ -688,6 +699,8 @@ export default function AdminStaffPage() {
         staffId: b.staffId,
         staffName: b.staffName,
         staffUnit,
+        cashUnits,
+        nonCashUnits,
         adminPaySum,
         lines,
       }
@@ -1006,74 +1019,86 @@ export default function AdminStaffPage() {
       {tab === 'misu' && (
         <>
         <GlassCard className="overflow-hidden p-0">
-          <div className="border-b border-white/10 bg-black/25 px-4 py-4 sm:px-5">
-            <div className="text-lg font-bold tracking-tight text-white">미수</div>
-            <div className="mt-1 flex flex-wrap items-baseline gap-x-3 gap-y-1 text-sm text-white/55">
+          <div className="border-b border-white/10 bg-black/25 px-3 py-2 sm:px-4">
+            <div className="text-sm font-bold tracking-tight text-white">미수</div>
+            <div className="mt-0.5 flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-[11px] text-white/45">
               <span className="tabular-nums">
-                <span className="font-semibold text-white/90">{misuTotal.count}</span>건
+                <span className="font-semibold text-white/80">{misuTotal.count}</span>건
               </span>
-              <span className="text-white/30">·</span>
-              <span className="tabular-nums font-semibold text-amber-200/90">{formatCurrency(misuTotal.sum)}원</span>
+              <span className="text-white/25">·</span>
+              <span className="tabular-nums font-semibold text-amber-200/85">{formatMoneyDotThousands(misuTotal.sum)}</span>
             </div>
-            <p className="mt-2 text-xs leading-snug text-white/40">저장·정산 반영 시 자동으로 맞춰집니다.</p>
+            <p className="mt-1 text-[10px] leading-snug text-white/35">저장·정산 반영 시 자동 반영</p>
           </div>
 
-          <div className="space-y-4 px-4 py-4 sm:px-5">
+          <div className="space-y-2.5 px-3 py-2.5 sm:px-4">
             {misuError && (
-              <div className="rounded-2xl border border-red-400/35 bg-red-500/15 px-4 py-3 text-sm font-medium text-red-100">{misuError}</div>
+              <div className="rounded-lg border border-red-400/35 bg-red-500/15 px-2.5 py-2 text-xs font-medium text-red-100">{misuError}</div>
             )}
 
             {misuLoading && (
-              <div className="py-12 text-center text-base text-white/55">불러오는 중…</div>
+              <div className="py-8 text-center text-xs text-white/50">불러오는 중…</div>
             )}
             {!misuLoading && misuByDay.length === 0 && (
-              <div className="py-12 text-center text-base text-white/55">미수 내역이 없습니다.</div>
+              <div className="py-8 text-center text-xs text-white/50">미수 내역이 없습니다.</div>
             )}
 
             {!misuLoading &&
               misuByDay.map((day) => (
                 <div
                   key={day.ymd}
-                  className="rounded-2xl border border-white/12 bg-gradient-to-b from-white/[0.06] to-black/25 p-4 shadow-lg ring-1 ring-black/20"
+                  className={cn(
+                    'rounded-xl border shadow-md',
+                    'border-amber-200/16 bg-gradient-to-b from-amber-950/25 via-zinc-950/90 to-zinc-950',
+                    'ring-1 ring-black/25'
+                  )}
                 >
-                  <div className="flex items-end justify-between gap-3 border-b border-white/10 pb-3">
-                    <span className="text-xl font-bold tabular-nums text-white">{day.ymd}</span>
-                    <div className="text-right text-sm text-white/55">
-                      <span className="font-semibold tabular-nums text-white/85">{day.count}</span>건 ·{' '}
-                      <span className="font-semibold tabular-nums text-amber-200/90">{formatCurrency(day.sum)}원</span>
+                  <div className="flex items-baseline justify-between gap-2 border-b border-white/10 bg-black/15 px-2.5 py-1.5 sm:px-3">
+                    <span className="font-mono text-xs font-bold tabular-nums text-white/90">{day.ymd}</span>
+                    <div className="text-right font-mono text-[10px] text-white/45">
+                      <span className="tabular-nums text-white/75">{day.count}</span>건{' '}
+                      <span className="text-white/25">·</span>{' '}
+                      <span className="tabular-nums font-semibold text-amber-200/85">{formatMoneyDotThousands(day.sum)}</span>
                     </div>
                   </div>
 
-                  <div className="mt-3 space-y-3">
+                  <div className="space-y-2 p-2 sm:p-2.5">
                     {day.items.map((it) => (
                       <div
                         key={it.paymentId}
-                        className="rounded-xl border border-white/10 bg-black/30 p-3.5 sm:p-4"
+                        className="overflow-hidden rounded-lg border border-white/10 bg-black/25"
                       >
-                        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
-                          <div className="min-w-0 flex-1 space-y-2">
-                            <div className="text-base font-bold text-white">{it.staffNickname}</div>
-                            <div className="text-sm font-medium text-white/75">
-                              <span className="break-words">{it.storeName}</span>
-                              <span className="tabular-nums text-white/50"> · {isoToHm(it.baseIso || it.createdAt)}</span>
-                            </div>
-                            <div className="text-xs text-white/40">{it.adminName ? `저장 ${it.adminName}` : '저장 —'}</div>
-                            <div className="text-sm leading-relaxed text-white/65 break-words">{it.lineText}</div>
-                          </div>
-                          <div className="flex shrink-0 flex-col gap-2 sm:w-36 sm:items-end">
-                            <div className="text-lg font-bold tabular-nums text-white sm:text-right">{formatCurrency(it.misuAmount)}원</div>
-                            <button
-                              type="button"
-                              onClick={() => setMisuConfirmItem(it)}
-                              className={cn(
-                                'inline-flex min-h-[48px] w-full items-center justify-center gap-2 rounded-xl border border-emerald-400/35',
-                                'bg-emerald-500/15 px-4 text-sm font-bold text-emerald-100 shadow-sm hover:bg-emerald-500/25 active:scale-[0.98] transition sm:w-full'
-                              )}
-                            >
-                              <CheckCircle2 className="h-5 w-5 shrink-0" />
-                              정산 완료
-                            </button>
-                          </div>
+                        <div className="border-b border-white/8 bg-black/20 px-2 py-1.5 sm:px-2.5">
+                          <p className="font-mono text-[11px] leading-snug text-white/88">
+                            <span className="break-words">{it.staffNickname}</span>
+                            <span className="text-white/35"> · </span>
+                            <span className="tabular-nums text-emerald-200/90">{formatMoneyDotThousands(it.misuAmount)}</span>
+                          </p>
+                        </div>
+                        <div
+                          className={cn(
+                            'bg-[linear-gradient(transparent_22px,rgba(255,255,255,0.03)_23px)] bg-[length:100%_23px] bg-local',
+                            'px-2 py-1.5 sm:px-2.5'
+                          )}
+                        >
+                          <p className="font-mono text-[11px] leading-relaxed text-white/75 break-words [word-break:break-word]">
+                            {it.storeName}
+                            {formatTimeKoHm(it.baseIso || it.createdAt)} {it.lineText}
+                          </p>
+                          <p className="mt-1 text-[9px] text-white/32">{it.adminName ? `저장 ${it.adminName}` : '저장 —'}</p>
+                        </div>
+                        <div className="border-t border-white/8 px-2 py-1.5 sm:px-2.5">
+                          <button
+                            type="button"
+                            onClick={() => setMisuConfirmItem(it)}
+                            className={cn(
+                              'inline-flex min-h-8 w-full items-center justify-center gap-1 rounded-md border border-emerald-400/30',
+                              'bg-emerald-500/12 px-2 text-[11px] font-bold text-emerald-100 hover:bg-emerald-500/22 active:scale-[0.98] transition'
+                            )}
+                          >
+                            <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
+                            정산 완료
+                          </button>
                         </div>
                       </div>
                     ))}
@@ -1144,14 +1169,16 @@ export default function AdminStaffPage() {
       {/* ------------------------- 정산 탭 (모바일·터치 우선) ------------------------- */}
       {tab === 'settle' && (
         <GlassCard className="overflow-hidden p-0">
-          <div className="border-b border-white/10 bg-black/25 px-4 py-4 sm:px-5">
-            <div className="min-w-0">
-              <div className="text-lg font-bold tracking-tight text-white">정산</div>
-              <div className="mt-1 text-xs leading-snug text-white/50">07:00 ~ 다음날 07:00 · 내역은 저장 시 자동 반영</div>
-              {settleProfilesLoading && <div className="mt-1 text-[11px] text-amber-200/70">직원 계좌·상태 동기화 중…</div>}
+          <div className="border-b border-white/10 bg-black/25 px-3 py-2.5 sm:px-4">
+            <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+              <div className="min-w-0">
+                <div className="text-base font-bold tracking-tight text-white">정산</div>
+                <div className="text-[11px] leading-snug text-white/45">07:00~익일 07:00 · 저장 시 반영</div>
+              </div>
+              {settleProfilesLoading && <div className="text-[10px] text-amber-200/70">동기화…</div>}
             </div>
 
-            <div className="mt-4 flex items-stretch gap-2">
+            <div className="mt-2 flex items-center gap-1.5">
               <button
                 type="button"
                 onClick={() => {
@@ -1159,14 +1186,14 @@ export default function AdminStaffPage() {
                   setSettleYmd(prev)
                   runSettlementDay(prev).catch(() => {})
                 }}
-                className="inline-flex min-h-[56px] min-w-[56px] shrink-0 items-center justify-center rounded-2xl border border-white/15 bg-white/10 text-white shadow-sm hover:bg-white/15 active:scale-[0.98] transition"
+                className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-white/12 bg-white/10 text-white hover:bg-white/15 active:scale-[0.98] transition"
                 aria-label="전날"
               >
-                <ChevronLeft className="h-7 w-7" strokeWidth={2.5} />
+                <ChevronLeft className="h-5 w-5" strokeWidth={2} />
               </button>
 
-              <div className="flex min-h-[56px] flex-1 flex-col items-center justify-center rounded-2xl border border-white/12 bg-black/35 px-2 py-2">
-                <span className="text-xl font-bold tabular-nums tracking-tight text-white">{settleYmd}</span>
+              <div className="flex min-h-9 flex-1 items-center justify-center gap-2 rounded-lg border border-white/10 bg-black/35 px-2 py-1">
+                <span className="text-sm font-bold tabular-nums text-white">{settleYmd}</span>
                 {settleYmd !== getKstDateString() && (
                   <button
                     type="button"
@@ -1175,9 +1202,9 @@ export default function AdminStaffPage() {
                       setSettleYmd(t)
                       runSettlementDay(t).catch(() => {})
                     }}
-                    className="mt-1 rounded-lg bg-emerald-500/20 px-3 py-1 text-xs font-bold text-emerald-200 ring-1 ring-emerald-400/30 active:scale-[0.98]"
+                    className="rounded-md bg-emerald-500/20 px-2 py-0.5 text-[10px] font-bold text-emerald-200 ring-1 ring-emerald-400/25 active:scale-[0.98]"
                   >
-                    오늘로
+                    오늘
                   </button>
                 )}
               </div>
@@ -1189,92 +1216,118 @@ export default function AdminStaffPage() {
                   setSettleYmd(next)
                   runSettlementDay(next).catch(() => {})
                 }}
-                className="inline-flex min-h-[56px] min-w-[56px] shrink-0 items-center justify-center rounded-2xl border border-white/15 bg-white/10 text-white shadow-sm hover:bg-white/15 active:scale-[0.98] transition"
+                className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-white/12 bg-white/10 text-white hover:bg-white/15 active:scale-[0.98] transition"
                 aria-label="다음날"
               >
-                <ChevronRight className="h-7 w-7" strokeWidth={2.5} />
+                <ChevronRight className="h-5 w-5" strokeWidth={2} />
               </button>
             </div>
           </div>
 
-          <div className="space-y-4 px-4 py-4 sm:px-5">
+          <div className="space-y-3 px-3 py-3 sm:px-4">
             {settleError && (
-              <div className="rounded-2xl border border-red-400/35 bg-red-500/15 px-4 py-3 text-sm font-medium text-red-100">{settleError}</div>
+              <div className="rounded-xl border border-red-400/35 bg-red-500/15 px-3 py-2 text-sm font-medium text-red-100">{settleError}</div>
             )}
 
             {settleLoading && (
-              <div className="py-10 text-center text-base text-white/55">정산 내역 불러오는 중…</div>
+              <div className="py-8 text-center text-sm text-white/55">정산 내역 불러오는 중…</div>
             )}
             {!settleLoading && settleStaffBlocks.length === 0 && (
-              <div className="py-10 text-center text-base text-white/55">해당 날짜에 내역이 없습니다.</div>
+              <div className="py-8 text-center text-sm text-white/55">해당 날짜에 내역이 없습니다.</div>
+            )}
+
+            {!settleLoading && settleStaffBlocks.length > 0 && (
+              <div className="text-[11px] text-white/40">직원 {settleStaffBlocks.length}명</div>
             )}
 
             {!settleLoading &&
               settleStaffBlocks.map((b) => {
                 const dayMap = settleProfiles[b.staffId]?.settlement_day_status
                 const proc = normalizeProcessKey(dayMap?.[settleYmd])
+                const headerOne = buildSettleStaffHeaderLine({
+                  staffName: b.staffName,
+                  cashUnits: b.cashUnits,
+                  nonCashUnits: b.nonCashUnits,
+                  staffUnit: b.staffUnit,
+                  proc,
+                })
                 return (
                   <div
                     key={b.staffId}
-                    className="rounded-2xl border border-white/12 bg-gradient-to-b from-white/[0.07] to-black/25 p-4 shadow-lg ring-1 ring-black/20"
+                    className={cn(
+                      'rounded-xl border shadow-md',
+                      'border-amber-200/18 bg-gradient-to-b from-amber-950/30 via-zinc-950/90 to-zinc-950',
+                      'ring-1 ring-black/25'
+                    )}
                   >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-                          <span className="text-xl font-bold text-white">{b.staffName}</span>
-                          <span className="text-lg font-semibold tabular-nums text-amber-200/95">{b.staffUnit}</span>
-                        </div>
-                        <div className="mt-1.5 text-sm font-semibold tabular-nums text-white/60">{formatCurrency(b.adminPaySum)}원</div>
-                      </div>
-                      <button
-                        type="button"
-                        title="정산 계좌·메모"
-                        onClick={() => openHeartForStaff(b.staffId, b.staffName)}
-                        className="inline-flex min-h-[52px] min-w-[52px] shrink-0 items-center justify-center rounded-2xl border border-amber-400/35 bg-amber-500/10 text-amber-100 shadow-inner hover:bg-amber-500/20 active:scale-[0.97] transition"
-                        aria-label="정산 계좌"
-                      >
-                        <Star className="h-6 w-6 fill-amber-400/35" strokeWidth={1.75} />
-                      </button>
-                    </div>
-
-                    <div className="mt-4 grid grid-cols-3 gap-2">
-                      {SETTLE_PROCESS_OPTIONS.map((key) => {
-                        const active = proc === key
-                        return (
+                    <div className="border-b border-white/10 bg-black/20 px-3 py-2 sm:px-4">
+                      <div className="flex items-start justify-between gap-2">
+                        <p className="min-w-0 flex-1 whitespace-pre-wrap break-words font-mono text-[13px] leading-snug text-white/90">
+                          {headerOne}
+                        </p>
+                        <div className="flex shrink-0 items-center gap-2">
                           <button
-                            key={key}
                             type="button"
+                            title={`처리상태: ${SETTLE_PROCESS_LABEL[proc]}`}
+                            onClick={() => setSettleProcessPicker({ staffId: b.staffId, staffName: b.staffName, current: proc })}
                             className={cn(
-                              'min-h-[52px] rounded-xl border px-1.5 py-2 text-center text-[11px] font-bold leading-tight transition sm:text-xs',
-                              active
-                                ? 'border-emerald-400/55 bg-emerald-500/25 text-emerald-50 shadow-[inset_0_1px_0_rgba(255,255,255,0.12)]'
-                                : 'border-white/12 bg-white/5 text-white/80 hover:bg-white/10 active:scale-[0.98]'
+                              'inline-flex h-9 w-9 items-center justify-center rounded-full border transition active:scale-[0.97]',
+                              proc === 'PENDING' && 'border-white/25 bg-white/10 text-white/80 hover:bg-white/15',
+                              proc === 'DEPOSIT_DONE' && 'border-emerald-400/45 bg-emerald-500/20 text-emerald-100 hover:bg-emerald-500/25',
+                              proc === 'CASH_DONE' && 'border-amber-400/45 bg-amber-500/20 text-amber-100 hover:bg-amber-500/25'
                             )}
-                            onClick={() => {
-                              persistProcessStatus(b.staffId, settleYmd, key).catch((err) =>
-                                setSettleError((err as Error)?.message ?? '처리 상태 저장 실패')
-                              )
-                            }}
+                            aria-label="정산 처리 상태 선택"
                           >
-                            {SETTLE_PROCESS_LABEL[key]}
+                            <Circle className="h-4 w-4" strokeWidth={2.2} />
                           </button>
-                        )
-                      })}
+                          <button
+                            type="button"
+                            title="정산 계좌·메모"
+                            onClick={() => openHeartForStaff(b.staffId, b.staffName)}
+                            className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-amber-400/35 bg-amber-500/10 text-amber-100 hover:bg-amber-500/20 active:scale-[0.97] transition"
+                            aria-label="정산 계좌"
+                          >
+                            <Star className="h-4 w-4 fill-amber-400/35" strokeWidth={1.75} />
+                          </button>
+                        </div>
+                      </div>
                     </div>
 
-                    <div className="mt-3 overflow-hidden rounded-xl border border-white/10 bg-black/30">
+                    <div
+                      className={cn(
+                        'bg-[linear-gradient(transparent_27px,rgba(255,255,255,0.035)_28px)] bg-[length:100%_28px] bg-local',
+                        'px-3 py-2 sm:px-4'
+                      )}
+                    >
                       {b.lines.map((ln, idx) => (
-                        <div
-                          key={ln.id}
-                          className={cn('px-3 py-3.5 sm:px-4 sm:py-4', idx > 0 && 'border-t border-white/8')}
-                        >
-                          <div className="text-base font-semibold leading-snug text-white">
-                            <span className="break-words">{ln.storeName}</span>{' '}
-                            <span className="tabular-nums text-white/75">{ln.timeHm}</span>
-                          </div>
-                          <div className="mt-2 text-sm leading-relaxed text-white/70 break-words">{ln.seq}</div>
+                        <div key={ln.id} className={cn('py-1.5', idx > 0 && 'border-t border-white/[0.07]')}>
+                          {ln.seq
+                            .split('\n')
+                            .filter((p) => p.trim() !== '')
+                            .map((part, si) => (
+                              <div
+                                key={`${ln.id}_${si}`}
+                                className={cn(
+                                  'font-mono text-[13px] leading-relaxed text-white/80 break-words [word-break:break-word]',
+                                  si > 0 && 'mt-1 pl-3 text-white/70'
+                                )}
+                              >
+                                {si === 0 ? (
+                                  <>
+                                    {ln.storeName}
+                                    {ln.timeKo} {part}
+                                  </>
+                                ) : (
+                                  part
+                                )}
+                              </div>
+                            ))}
                         </div>
                       ))}
+                    </div>
+
+                    <div className="border-t border-white/10 px-3 py-2 text-right font-mono text-[15px] font-semibold tabular-nums text-emerald-200/95 sm:px-4">
+                      {formatMoneyDotThousands(b.adminPaySum)}
                     </div>
                   </div>
                 )
@@ -1282,6 +1335,49 @@ export default function AdminStaffPage() {
           </div>
 
           {/* 별: 정산 계좌 (실시간 저장) */}
+          {settleProcessPicker && (
+            <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+              <button
+                type="button"
+                className="absolute inset-0 bg-black/70 backdrop-blur-sm"
+                aria-label="닫기"
+                onClick={() => setSettleProcessPicker(null)}
+              />
+              <div className="relative w-full max-w-xs">
+                <div className="rounded-2xl border border-white/15 bg-zinc-950 p-4 shadow-2xl">
+                  <div className="mb-3">
+                    <div className="truncate text-base font-bold text-white">{settleProcessPicker.staffName}</div>
+                    <div className="mt-1 text-xs text-white/55">처리 상태를 선택하세요</div>
+                  </div>
+                  <div className="space-y-2">
+                    {SETTLE_PROCESS_OPTIONS.map((key) => {
+                      const active = settleProcessPicker.current === key
+                      return (
+                        <button
+                          key={key}
+                          type="button"
+                          className={cn(
+                            'w-full rounded-lg border px-3 py-2.5 text-sm font-bold transition',
+                            active
+                              ? 'border-emerald-400/55 bg-emerald-500/25 text-emerald-50'
+                              : 'border-white/12 bg-white/5 text-white/85 hover:bg-white/10'
+                          )}
+                          onClick={() => {
+                            persistProcessStatus(settleProcessPicker.staffId, settleYmd, key)
+                              .then(() => setSettleProcessPicker(null))
+                              .catch((err) => setSettleError((err as Error)?.message ?? '처리 상태 저장 실패'))
+                          }}
+                        >
+                          {SETTLE_PROCESS_LABEL[key]}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           {heartStaffId && heartDraft && (
             <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
               <button

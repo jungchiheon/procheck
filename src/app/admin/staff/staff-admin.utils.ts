@@ -377,6 +377,52 @@ export function formatCurrency(n: number) {
   return v.toLocaleString('ko-KR')
 }
 
+/** 정산 메모 예시: `홍콩9시52분` — 시 앞 0 없음 */
+export function formatTimeKoHm(iso: string) {
+  const d = new Date(iso)
+  if (!Number.isFinite(d.getTime())) return ''
+  const h = d.getHours()
+  const m = d.getMinutes()
+  return `${h}시${String(m).padStart(2, '0')}분`
+}
+
+/** 정산·미수 합계 줄: `72,000` (천 단위 쉼표, 원 접미 없음) */
+export function formatMoneyDotThousands(won: number) {
+  const n = Math.round(Math.max(0, Number(won) || 0))
+  return n.toLocaleString('ko-KR')
+}
+
+/**
+ * 예시 헤더 한 줄:
+ * `미지 568 입금` · `보영 1000 현금 / 234 입금` · `지원 312 정산`
+ * (직원 급여 천원 단위, 현금/비현금 분리 시 `현금 / 입금`)
+ */
+export function buildSettleStaffHeaderLine(opts: {
+  staffName: string
+  cashUnits: number
+  nonCashUnits: number
+  staffUnit: number
+  proc: SettleProcessKey
+}) {
+  const { staffName, cashUnits, nonCashUnits, staffUnit, proc } = opts
+  const cu = Math.max(0, Math.round(Number(cashUnits) || 0))
+  const nu = Math.max(0, Math.round(Number(nonCashUnits) || 0))
+  const su = Math.max(0, Math.round(Number(staffUnit) || 0))
+
+  if (cu > 0 && nu > 0) {
+    return `${staffName} ${cu} 현금 / ${nu} 입금`
+  }
+  if (cu > 0) {
+    return `${staffName} ${cu} 현금`
+  }
+  if (nu > 0) {
+    const tail = proc === 'PENDING' ? '정산' : '입금'
+    return `${staffName} ${nu} ${tail}`
+  }
+  const tail = proc === 'CASH_DONE' ? '현금' : proc === 'DEPOSIT_DONE' ? '입금' : '정산'
+  return `${staffName} ${su} ${tail}`
+}
+
 /* ---- settlement helpers ---- */
 function safeJson(s: string | null) {
   if (!s) return null
