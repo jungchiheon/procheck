@@ -320,46 +320,50 @@ export function AdminNotificationBell() {
       ref={panelRef}
       style={panelStyle}
       className={cn(
-        'overflow-hidden rounded-2xl',
-        'border border-white/12 bg-zinc-950/95 backdrop-blur-xl shadow-2xl'
+        'overflow-hidden rounded-xl',
+        'border border-white/12 bg-zinc-950/95 backdrop-blur-xl shadow-2xl ring-1 ring-black/25'
       )}
     >
-      {/* 헤더 */}
-      <div className="px-4 py-3 flex items-center justify-between gap-3">
-        <div className="text-sm font-semibold text-white">호출 알림</div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => loadRecent()}
-            disabled={loading}
-            className="text-xs text-white/55 hover:text-white/80 transition disabled:opacity-50"
-            type="button"
-          >
-            {loading ? '갱신 중...' : '새로고침'}
-          </button>
-          <button
-            onClick={onMarkAllRead}
-            disabled={loading || count === 0}
-            className={cn(
-              'inline-flex items-center gap-1 rounded-xl px-3 py-1.5 text-xs border transition',
-              'border-white/12 bg-white/5 text-white/80 hover:bg-white/10',
-              'disabled:opacity-50 disabled:cursor-not-allowed'
-            )}
-            type="button"
-          >
-            <Check className="h-3.5 w-3.5" />
-            모두 읽음
-          </button>
+      <div className="border-b border-white/10 bg-black/25 px-3 py-2 sm:px-4">
+        <div className="flex items-center justify-between gap-2">
+          <div className="min-w-0">
+            <div className="text-sm font-bold tracking-tight text-white">호출 알림</div>
+            <div className="mt-0.5 text-[10px] text-white/40">직원 호출 · 승인 시 읽음 처리</div>
+          </div>
+          <div className="flex shrink-0 items-center gap-1.5">
+            <button
+              onClick={() => void loadRecent()}
+              disabled={loading}
+              className="rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-[11px] font-semibold text-white/70 hover:bg-white/10 transition disabled:opacity-50"
+              type="button"
+            >
+              {loading ? '…' : '갱신'}
+            </button>
+            <button
+              onClick={() => void onMarkAllRead()}
+              disabled={loading || count === 0}
+              className={cn(
+                'inline-flex items-center gap-1 rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-[11px] font-semibold text-white/80 transition',
+                'hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40'
+              )}
+              type="button"
+            >
+              <Check className="h-3 w-3" strokeWidth={2.5} />
+              전체 읽음
+            </button>
+          </div>
         </div>
       </div>
 
-      <div className="h-px w-full bg-white/10" />
-
-      {/* 내용 */}
-      <div className="max-h-[70vh] overflow-y-auto">
-        {loading && <div className="px-4 py-6 text-sm text-white/60">Loading...</div>}
-        {!loading && error && <div className="px-4 py-4 text-sm text-red-200">{error}</div>}
+      <div className="max-h-[70vh] overflow-y-auto overscroll-contain [scrollbar-width:thin]">
+        {loading && items.length === 0 && (
+          <div className="px-3 py-8 text-center text-xs text-white/45">불러오는 중…</div>
+        )}
+        {!loading && error && (
+          <div className="mx-3 my-2 rounded-lg border border-red-400/30 bg-red-500/10 px-2.5 py-2 text-xs text-red-100">{error}</div>
+        )}
         {!loading && !error && items.length === 0 && (
-          <div className="px-4 py-6 text-sm text-white/60">최근 호출이 없습니다.</div>
+          <div className="px-3 py-8 text-center text-xs text-white/45">최근 호출이 없습니다.</div>
         )}
 
         {!loading &&
@@ -372,75 +376,87 @@ export function AdminNotificationBell() {
             const minutes = minutesMap[n.id] ?? 0
 
             return (
-              <div key={n.id} className="px-4 py-4 border-b border-white/10">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <div className="text-sm text-white font-semibold truncate">{who}</div>
-                    <div className="mt-1 text-[11px] text-white/45">{toKstHm(n.created_at)}</div>
-                    {n.message && <div className="mt-2 text-xs text-white/60">{n.message}</div>}
-                  </div>
-
-                  <div
-                    className={cn(
-                      'shrink-0 rounded-full px-2 py-1 text-[11px] border',
-                      isApproved
-                        ? 'border-emerald-300/30 bg-emerald-500/10 text-emerald-100'
-                        : 'border-white/12 bg-white/5 text-white/60'
-                    )}
-                  >
-                    {isApproved ? '승인됨' : '대기'}
-                  </div>
-                </div>
-
-                {!n.is_read && <div className="mt-2 text-[11px] text-emerald-200/80">미확인</div>}
-
-                {isPending && (
-                  <div className="mt-3 flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => bumpMinutes(n.id, -5)}
-                        className="rounded-xl border border-white/12 bg-white/5 p-2 text-white/85 hover:bg-white/10 transition"
-                        aria-label="-5분"
-                      >
-                        <Minus className="h-4 w-4" />
-                      </button>
-
-                      <div className="min-w-[84px] text-center text-sm text-white">{minutes}분</div>
-
-                      <button
-                        type="button"
-                        onClick={() => bumpMinutes(n.id, +5)}
-                        className="rounded-xl border border-white/12 bg-white/5 p-2 text-white/85 hover:bg-white/10 transition"
-                        aria-label="+5분"
-                      >
-                        <Plus className="h-4 w-4" />
-                      </button>
+              <div key={n.id} className="border-b border-white/[0.06] px-3 py-2.5 last:border-b-0 sm:px-4">
+                <div className="rounded-lg border border-white/10 bg-black/20 p-2.5">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                        <span className="truncate text-[13px] font-semibold text-white">{who}</span>
+                        {!n.is_read && (
+                          <span className="shrink-0 rounded border border-emerald-400/25 bg-emerald-500/15 px-1.5 py-0.5 text-[9px] font-bold text-emerald-200/90">
+                            미확인
+                          </span>
+                        )}
+                      </div>
+                      <div className="mt-1 font-mono text-[11px] tabular-nums text-white/40">{toKstHm(n.created_at)}</div>
+                      {n.message && (
+                        <p className="mt-1.5 text-[11px] leading-snug text-white/55 break-words">{n.message}</p>
+                      )}
                     </div>
 
-                    <button
-                      type="button"
-                      onClick={() => onApprove(n)}
-                      disabled={actionId === n.id}
+                    <div
                       className={cn(
-                        'inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold transition',
-                        'bg-white text-zinc-900 hover:bg-white/90 active:bg-white/80',
-                        'disabled:opacity-60 disabled:cursor-not-allowed'
+                        'shrink-0 rounded-md border px-2 py-0.5 text-[10px] font-bold',
+                        isApproved
+                          ? 'border-emerald-400/35 bg-emerald-500/15 text-emerald-100'
+                          : 'border-white/12 bg-white/5 text-white/55'
                       )}
                     >
-                      <Check className="h-4 w-4" />
-                      {actionId === n.id ? '처리 중...' : '승인'}
-                    </button>
+                      {isApproved ? '승인' : '대기'}
+                    </div>
                   </div>
-                )}
 
-                {isApproved && (
-                  <div className="mt-3 text-xs text-white/60">
-                    도착 대기 시간 :{' '}
-                    <span className="text-white/85 font-semibold">{Number(n.approved_minutes ?? 0)}분</span>
-                    {n.approved_at && <span className="ml-2">({toKstHm(n.approved_at)})</span>}
-                  </div>
-                )}
+                  {isPending && (
+                    <div className="mt-2.5 flex flex-wrap items-center justify-between gap-2 border-t border-white/8 pt-2.5">
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => bumpMinutes(n.id, -5)}
+                          className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-white/12 bg-white/5 text-white/85 hover:bg-white/10 transition"
+                          aria-label="5분 감소"
+                        >
+                          <Minus className="h-3.5 w-3.5" />
+                        </button>
+                        <div className="min-w-[4.5rem] text-center font-mono text-xs font-semibold tabular-nums text-white/90">
+                          {minutes}분
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => bumpMinutes(n.id, +5)}
+                          className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-white/12 bg-white/5 text-white/85 hover:bg-white/10 transition"
+                          aria-label="5분 증가"
+                        >
+                          <Plus className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => void onApprove(n)}
+                        disabled={actionId === n.id}
+                        className={cn(
+                          'inline-flex min-h-8 items-center gap-1.5 rounded-lg border border-white/15 px-3 py-1.5 text-[11px] font-bold transition',
+                          'bg-white text-zinc-900 hover:bg-white/90 active:scale-[0.98]',
+                          'disabled:cursor-not-allowed disabled:opacity-60'
+                        )}
+                      >
+                        <Check className="h-3.5 w-3.5" strokeWidth={2.5} />
+                        {actionId === n.id ? '처리 중…' : '승인'}
+                      </button>
+                    </div>
+                  )}
+
+                  {isApproved && (
+                    <div className="mt-2 border-t border-white/8 pt-2 text-[11px] text-white/50">
+                      승인 분{' '}
+                      <span className="font-mono font-semibold tabular-nums text-emerald-200/90">{Number(n.approved_minutes ?? 0)}</span>
+                      분
+                      {n.approved_at && (
+                        <span className="ml-2 font-mono text-[10px] text-white/35">· {toKstHm(n.approved_at)}</span>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
             )
           })}

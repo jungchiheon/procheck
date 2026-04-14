@@ -7,7 +7,7 @@ import { GlassCard } from '@/components/ui/GlassCard'
 import { PageHeader } from '@/components/ui/PageHeader'
 import { ProButton } from '@/components/ui/ProButton'
 import { cn } from '@/lib/cn'
-import { Star, Save, Trash2, ChevronLeft, ChevronRight, X, UserCheck } from 'lucide-react'
+import { Save, Trash2, ChevronLeft, ChevronRight, X, UserCheck } from 'lucide-react'
 import { MISU_MARK } from '../staff-admin.types'
 import { v5DisplayLineFromTokens } from '../staff-admin.utils'
 
@@ -29,6 +29,19 @@ const QUICK_WORK_STATUS: { value: StaffStatus; label: string }[] = [
   { value: 'CHOICE_DONE', label: '초이스완료' },
   { value: 'CAR_WAIT', label: '차대기중' },
 ]
+
+const ATT_SUB_STATUSES: StaffStatus[] = ['CHOICE_ING', 'CHOICE_DONE', 'CAR_WAIT']
+
+/** 근태 모달: 퇴근이 아닌 경우 구형 WORKING/LODGE_WAIT → 초이스중으로 맞춤 */
+function normalizeAttForModal(s: StaffStatus): StaffStatus {
+  if (s === 'OFF') return 'OFF'
+  if (s === 'CHOICE_ING' || s === 'CHOICE_DONE' || s === 'CAR_WAIT') return s
+  return 'CHOICE_ING'
+}
+
+function isOnShiftStatus(s: StaffStatus | null | undefined): boolean {
+  return s != null && s !== 'OFF'
+}
 
 function statusLabel(s: string | null | undefined): string {
   const k = s as StaffStatus
@@ -934,7 +947,7 @@ export default function AdminStaffDetailPage() {
           <div className="flex items-center gap-2">
             <button
               onClick={() => {
-                setAttStatus(((staff?.work_status as StaffStatus) ?? 'OFF') as StaffStatus)
+                setAttStatus(normalizeAttForModal(((staff?.work_status as StaffStatus) ?? 'OFF') as StaffStatus))
                 setAttOpen(true)
               }}
               className={cn(
@@ -947,20 +960,6 @@ export default function AdminStaffDetailPage() {
               title="근태"
             >
               <UserCheck className="h-5 w-5" />
-            </button>
-
-            <button
-              onClick={() => setBankOpen(true)}
-              className={cn(
-                'inline-flex items-center justify-center',
-                'h-10 w-10 rounded-xl border border-white/12 bg-white/5',
-                'text-white/85 hover:bg-white/10 transition'
-              )}
-              type="button"
-              aria-label="계좌"
-              title="계좌"
-            >
-              <Star className="h-5 w-5" />
             </button>
 
             <ProButton variant="ghost" onClick={onLogout}>
@@ -1049,31 +1048,33 @@ export default function AdminStaffDetailPage() {
           </div>
         </div>
 
-        {/* 초이스 / 차대기 — 클릭 시 즉시 저장(Realtime으로 다른 화면과 동기화) */}
-        <div className="mt-4">
-          <div className="text-xs text-white/45 mb-2">상태 (초이스·차대기)</div>
-          <div className="grid grid-cols-3 gap-2">
-            {QUICK_WORK_STATUS.map(({ value, label }) => {
-              const current = (staff?.work_status as StaffStatus | undefined) ?? attStatus
-              const active = current === value
-              return (
-                <button
-                  key={value}
-                  type="button"
-                  disabled={workStatusSaving}
-                  onClick={() => persistQuickWorkStatus(value)}
-                  className={cn(
-                    'rounded-xl border px-3 py-2.5 text-sm font-semibold transition',
-                    active ? 'bg-white text-zinc-900 border-white/0' : 'bg-white/5 text-white/85 border-white/12 hover:bg-white/10',
-                    workStatusSaving && 'opacity-70'
-                  )}
-                >
-                  {label}
-                </button>
-              )
-            })}
+        {/* 초이스 / 차대기 — 출근(퇴근 아님)일 때만 표시 · 클릭 시 즉시 저장 */}
+        {isOnShiftStatus((staff?.work_status as StaffStatus | undefined) ?? attStatus) && (
+          <div className="mt-4">
+            <div className="text-xs text-white/45 mb-2">상태 (초이스·차대기)</div>
+            <div className="grid grid-cols-3 gap-2">
+              {QUICK_WORK_STATUS.map(({ value, label }) => {
+                const current = (staff?.work_status as StaffStatus | undefined) ?? attStatus
+                const active = current === value
+                return (
+                  <button
+                    key={value}
+                    type="button"
+                    disabled={workStatusSaving}
+                    onClick={() => persistQuickWorkStatus(value)}
+                    className={cn(
+                      'rounded-xl border px-3 py-2.5 text-sm font-semibold transition',
+                      active ? 'bg-white text-zinc-900 border-white/0' : 'bg-white/5 text-white/85 border-white/12 hover:bg-white/10',
+                      workStatusSaving && 'opacity-70'
+                    )}
+                  >
+                    {label}
+                  </button>
+                )
+              })}
+            </div>
           </div>
-        </div>
+        )}
 
         {/* ✅ 3x5 버튼 (쌓기) */}
         <div className="mt-4">
@@ -1295,21 +1296,52 @@ export default function AdminStaffDetailPage() {
                 </button>
               </div>
 
-              <div className="mt-5 grid grid-cols-3 gap-2">
-                {(['WORKING', 'CAR_WAIT', 'LODGE_WAIT', 'CHOICE_ING', 'CHOICE_DONE', 'OFF'] as StaffStatus[]).map((s) => (
-                  <button
-                    key={s}
-                    type="button"
-                    onClick={() => setAttStatus(s)}
-                    className={cn(
-                      'rounded-xl border px-3 py-3 text-sm font-semibold transition',
-                      attStatus === s ? 'bg-white text-zinc-900 border-white/0' : 'bg-white/5 text-white/85 border-white/12 hover:bg-white/10'
-                    )}
-                  >
-                    {STAFF_STATUS_LABEL[s]}
-                  </button>
-                ))}
+              <div className="mt-5 grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (attStatus === 'OFF') setAttStatus('CHOICE_ING')
+                  }}
+                  className={cn(
+                    'rounded-xl border px-3 py-3 text-sm font-semibold transition',
+                    isOnShiftStatus(attStatus)
+                      ? 'bg-white text-zinc-900 border-white/0'
+                      : 'bg-white/5 text-white/85 border-white/12 hover:bg-white/10'
+                  )}
+                >
+                  출근
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAttStatus('OFF')}
+                  className={cn(
+                    'rounded-xl border px-3 py-3 text-sm font-semibold transition',
+                    attStatus === 'OFF'
+                      ? 'bg-white text-zinc-900 border-white/0'
+                      : 'bg-white/5 text-white/85 border-white/12 hover:bg-white/10'
+                  )}
+                >
+                  퇴근
+                </button>
               </div>
+
+              {isOnShiftStatus(attStatus) && (
+                <div className="mt-3 grid grid-cols-3 gap-2">
+                  {ATT_SUB_STATUSES.map((s) => (
+                    <button
+                      key={s}
+                      type="button"
+                      onClick={() => setAttStatus(s)}
+                      className={cn(
+                        'rounded-xl border px-2 py-2.5 text-xs font-semibold transition sm:text-sm',
+                        attStatus === s ? 'bg-white text-zinc-900 border-white/0' : 'bg-white/5 text-white/85 border-white/12 hover:bg-white/10'
+                      )}
+                    >
+                      {STAFF_STATUS_LABEL[s]}
+                    </button>
+                  ))}
+                </div>
+              )}
 
               <div className="mt-5 flex gap-2">
                 <ProButton variant="ghost" className="flex-1" type="button" onClick={() => setAttOpen(false)} disabled={attSaving}>

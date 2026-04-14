@@ -8,7 +8,7 @@ import { GlassCard } from '@/components/ui/GlassCard'
 import { PageHeader } from '@/components/ui/PageHeader'
 import { cn } from '@/lib/cn'
 import { AdminNotificationBell } from '@/components/AdminNotificationBell'
-import { CheckCircle2, X, ChevronLeft, ChevronRight, Star, Circle } from 'lucide-react'
+import { CheckCircle2, X, ChevronLeft, ChevronRight, Star, Circle, Trash2 } from 'lucide-react'
 import { ProButton } from '@/components/ui/ProButton'
 import { StaffListTab } from './_components/StaffListTab'
 import { fetchStaffListForAdmin } from './staff-admin.fetch'
@@ -71,6 +71,7 @@ export default function AdminStaffPage() {
 
   const [error, setError] = useState<string | null>(null)
   const [syncing, setSyncing] = useState(false)
+  const [resetWorkBusy, setResetWorkBusy] = useState(false)
 
   // staff
   const [rows, setRows] = useState<StaffRow[]>([])
@@ -322,6 +323,49 @@ export default function AdminStaffPage() {
   const onLogout = async () => {
     await supabaseClient.auth.signOut()
     router.replace('/login')
+  }
+
+  /** 근무·정산 저장 테이블만 비움 (직원·관리자 프로필·계정 유지) */
+  const onResetWorkData = async () => {
+    if (
+      !window.confirm(
+        '데이터를 삭제하시겠습니까?'
+
+      )
+    )
+      return
+    if (!window.confirm('마지막 확인: 전체 삭제를 진행합니다.')) return
+
+    setResetWorkBusy(true)
+    setError(null)
+    try {
+      const { data: sess } = await supabaseClient.auth.getSession()
+      const token = sess.session?.access_token
+      if (!token) throw new Error('로그인이 필요합니다.')
+
+      const res = await fetch('/api/admin/reset-work-data', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      const json = (await res.json().catch(() => ({}))) as {
+        error?: string
+        deleted?: { payments?: number; workLogs?: number }
+        settlementDayStatusCleared?: boolean
+        settlementDayStatusNote?: string
+      }
+      if (!res.ok) throw new Error(json?.error || '초기화 실패')
+
+      const d = json.deleted
+      let msg = `초기화 완료: 정산(결제) 로그 ${d?.payments ?? 0}건, 근무 로그 ${d?.workLogs ?? 0}건 삭제.`
+      if (json.settlementDayStatusCleared) msg += ' 일별 정산 처리 상태 초기화됨.'
+      if (json.settlementDayStatusNote) msg += `\n${json.settlementDayStatusNote}`
+      window.alert(msg)
+      window.location.reload()
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : '오류')
+    } finally {
+      setResetWorkBusy(false)
+    }
   }
 
   const visible = ordered.slice(0, renderCount)
@@ -978,11 +1022,25 @@ export default function AdminStaffPage() {
           정산
         </button>
 
+        <button
+          type="button"
+          disabled={resetWorkBusy}
+          onClick={() => void onResetWorkData()}
+          title="근무·정산 저장 데이터 초기화 (계정·직원 목록은 유지)"
+          aria-label="근무·정산 저장 데이터 초기화"
+          className={cn(
+            'inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border transition',
+            'border-red-400/35 bg-red-500/10 text-red-100 hover:bg-red-500/20 disabled:opacity-50 active:scale-[0.98]'
+          )}
+        >
+          <Trash2 className="h-4 w-4" strokeWidth={2.2} />
+        </button>
+
         <div className="flex-1" />
         <div className="text-xs text-white/40">{syncing ? '동기화 중…' : '\u00A0'}</div>
       </div>
 
-      {error && tab === 'staff' && (
+      {error && (
         <GlassCard className="p-5">
           <div className="text-sm text-red-200">{error}</div>
         </GlassCard>
