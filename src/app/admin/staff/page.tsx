@@ -209,6 +209,7 @@ export default function AdminStaffPage() {
   }
 
   const ordered = useMemo(() => {
+    if (tab !== 'staff') return []
     const list = [...rows]
     list.sort((a, b) => {
       const ag = groupOfRow(a)
@@ -230,7 +231,7 @@ export default function AdminStaffPage() {
       return (a.nickname || '').localeCompare(b.nickname || '', 'ko')
     })
     return list
-  }, [rows, visitMap, sortMode])
+  }, [rows, visitMap, sortMode, tab])
 
   // 점진 렌더 sentinel
   useEffect(() => {
@@ -275,13 +276,41 @@ export default function AdminStaffPage() {
     markVisitedIdle(staffId)
   }
 
-  const onApplyStatusToStaffs = async (staffIds: string[], status: Extract<StaffStatus, 'CHOICE_ING' | 'CHOICE_DONE' | 'CAR_WAIT'>) => {
+  const STAFF_PREFILL_KEY = (staffId: string) => `pc_staff_prefill_${staffId}_v1`
+
+  const onApplyStatusToStaffs = async (
+    staffIds: string[],
+    status: Extract<StaffStatus, 'CHOICE_ING' | 'CHOICE_DONE' | 'CAR_WAIT'>,
+    prefill?: { storeId: number; storeName: string; workTime: string }
+  ) => {
     if (!staffIds.length) return
     setError(null)
     const uniq = Array.from(new Set(staffIds.filter(Boolean)))
     const { error } = await supabaseClient.from('user_profiles').update({ work_status: status }).in('id', uniq)
     if (error) throw new Error(`근태 일괄 변경 실패: ${error.message}`)
     setRows((prev) => prev.map((r) => (uniq.includes(r.id) ? { ...r, work_status: status } : r)))
+
+    for (const id of uniq) {
+      const key = STAFF_PREFILL_KEY(id)
+      if (status === 'CAR_WAIT') {
+        try {
+          localStorage.removeItem(key)
+        } catch {}
+        continue
+      }
+      if (!prefill) continue
+      try {
+        localStorage.setItem(
+          key,
+          JSON.stringify({
+            ts: Date.now(),
+            storeId: prefill.storeId,
+            storeName: prefill.storeName,
+            workTime: prefill.workTime,
+          })
+        )
+      } catch {}
+    }
   }
 
   // 직원 추가
@@ -414,6 +443,7 @@ export default function AdminStaffPage() {
   const visible = ordered.slice(0, renderCount)
 
   const affiliationStaffRows = useMemo(() => {
+    if (tab !== 'attendance') return []
     const arr = rows.filter((r) => r.affiliation === attAffTab)
     arr.sort((a, b) => {
       const aOn = isOnShift(a.work_status) ? 0 : 1
@@ -422,7 +452,7 @@ export default function AdminStaffPage() {
       return (a.nickname || '').localeCompare(b.nickname || '', 'ko')
     })
     return arr
-  }, [rows, attAffTab])
+  }, [rows, attAffTab, tab])
 
   /* ------------------------- 미수 관리 ------------------------- */
   const loadMisu = async (opts?: { force?: boolean; silent?: boolean }) => {
@@ -593,6 +623,7 @@ export default function AdminStaffPage() {
   }, [tab])
 
   const misuByDay = useMemo(() => {
+    if (tab !== 'misu') return []
     void misuSyncTick
     const map = new Map<string, MisuItem[]>()
     for (const it of misuItems) {
@@ -606,12 +637,13 @@ export default function AdminStaffPage() {
         return { ymd, items, sum, count: items.length }
       })
       .sort((a, b) => (a.ymd < b.ymd ? 1 : -1))
-  }, [misuItems, misuSyncTick])
+  }, [misuItems, misuSyncTick, tab])
 
   const misuTotal = useMemo(() => {
+    if (tab !== 'misu') return { sum: 0, count: 0 }
     const sum = misuItems.reduce((s, x) => s + (x.misuAmount || 0), 0)
     return { sum, count: misuItems.length }
-  }, [misuItems])
+  }, [misuItems, tab])
 
   const runMisuDone = async (it: MisuItem) => {
     setMisuError(null)
@@ -1628,98 +1660,102 @@ export default function AdminStaffPage() {
             </div>
           )}
 
-          {heartStaffId && heartDraft && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-              <button
-                type="button"
-                className="absolute inset-0 bg-black/70 backdrop-blur-sm"
-                aria-label="닫기"
-                onClick={() => closeHeartModal()}
-              />
-              <div className="relative w-full max-w-md max-h-[90vh] overflow-y-auto">
-                <div
-                  className={cn(
-                    'rounded-2xl border border-white/15 p-6 shadow-2xl',
-                    'bg-zinc-950'
-                  )}
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <div className="text-xl font-bold tracking-tight text-white truncate">{heartStaffNickname}</div>
-                      <div className="mt-1 text-sm text-white/50">정산 계좌 · 입력 시 자동 저장</div>
+          {heartStaffId &&
+            heartDraft &&
+            typeof document !== 'undefined' &&
+            createPortal(
+              <div className="fixed inset-0 z-[200] overflow-y-auto">
+                <button
+                  type="button"
+                  className="absolute inset-0 bg-black/70 backdrop-blur-sm"
+                  aria-label="닫기"
+                  onClick={() => closeHeartModal()}
+                />
+                <div className="relative z-[1] mx-auto flex min-h-[100dvh] w-full max-w-md items-center p-4 sm:py-8">
+                  <div
+                    className={cn(
+                      'max-h-[calc(100dvh-2rem)] w-full overflow-y-auto rounded-2xl border border-white/15 p-6 shadow-2xl',
+                      'bg-zinc-950'
+                    )}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="text-xl font-bold tracking-tight text-white truncate">{heartStaffNickname}</div>
+                        <div className="mt-1 text-sm text-white/50">정산 계좌 · 입력 시 자동 저장</div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => closeHeartModal()}
+                        className="inline-flex min-h-[48px] min-w-[48px] shrink-0 items-center justify-center rounded-2xl border border-white/12 bg-white/10 text-white/90 hover:bg-white/15 active:scale-[0.98] transition"
+                        aria-label="닫기"
+                      >
+                        <X className="h-6 w-6" />
+                      </button>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => closeHeartModal()}
-                      className="inline-flex min-h-[48px] min-w-[48px] shrink-0 items-center justify-center rounded-2xl border border-white/12 bg-white/10 text-white/90 hover:bg-white/15 active:scale-[0.98] transition"
-                      aria-label="닫기"
-                    >
-                      <X className="h-6 w-6" />
-                    </button>
-                  </div>
 
-                  <div className="mt-5 space-y-4">
-                    <div>
-                      <label className="text-base font-semibold text-white/85">은행명</label>
-                      <input
-                        className="mt-2 min-h-[52px] w-full rounded-xl border border-white/12 bg-zinc-900 px-4 py-3 text-base text-white outline-none placeholder:text-white/30 focus:border-white/25"
-                        value={heartDraft.bank_name}
-                        onChange={(e) => {
-                          const next = { ...heartDraft, bank_name: e.target.value }
-                          setHeartDraft(next)
-                          scheduleHeartSave(heartStaffId, next)
-                        }}
-                        placeholder="은행명"
-                        autoComplete="off"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-base font-semibold text-white/85">예금주</label>
-                      <input
-                        className="mt-2 min-h-[52px] w-full rounded-xl border border-white/12 bg-zinc-900 px-4 py-3 text-base text-white outline-none placeholder:text-white/30 focus:border-white/25"
-                        value={heartDraft.bank_holder}
-                        onChange={(e) => {
-                          const next = { ...heartDraft, bank_holder: e.target.value }
-                          setHeartDraft(next)
-                          scheduleHeartSave(heartStaffId, next)
-                        }}
-                        placeholder="예금주"
-                        autoComplete="off"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-base font-semibold text-white/85">계좌번호</label>
-                      <input
-                        className="mt-2 min-h-[52px] w-full rounded-xl border border-white/12 bg-zinc-900 px-4 py-3 text-base text-white outline-none placeholder:text-white/30 focus:border-white/25"
-                        value={heartDraft.bank_account}
-                        onChange={(e) => {
-                          const next = { ...heartDraft, bank_account: e.target.value }
-                          setHeartDraft(next)
-                          scheduleHeartSave(heartStaffId, next)
-                        }}
-                        placeholder="계좌번호"
-                        autoComplete="off"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-base font-semibold text-white/85">메모</label>
-                      <textarea
-                        className="mt-2 min-h-[160px] w-full rounded-xl border border-white/12 bg-zinc-900 px-4 py-4 text-base text-white leading-relaxed outline-none placeholder:text-white/30 focus:border-white/25 resize-y"
-                        value={heartDraft.settlement_traits}
-                        onChange={(e) => {
-                          const next = { ...heartDraft, settlement_traits: e.target.value }
-                          setHeartDraft(next)
-                          scheduleHeartSave(heartStaffId, next)
-                        }}
-                        placeholder="메모를 입력하세요"
-                        autoComplete="off"
-                      />
+                    <div className="mt-5 space-y-4">
+                      <div>
+                        <label className="text-base font-semibold text-white/85">은행명</label>
+                        <input
+                          className="mt-2 min-h-[52px] w-full rounded-xl border border-white/12 bg-zinc-900 px-4 py-3 text-base text-white outline-none placeholder:text-white/30 focus:border-white/25"
+                          value={heartDraft.bank_name}
+                          onChange={(e) => {
+                            const next = { ...heartDraft, bank_name: e.target.value }
+                            setHeartDraft(next)
+                            scheduleHeartSave(heartStaffId, next)
+                          }}
+                          placeholder="은행명"
+                          autoComplete="off"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-base font-semibold text-white/85">예금주</label>
+                        <input
+                          className="mt-2 min-h-[52px] w-full rounded-xl border border-white/12 bg-zinc-900 px-4 py-3 text-base text-white outline-none placeholder:text-white/30 focus:border-white/25"
+                          value={heartDraft.bank_holder}
+                          onChange={(e) => {
+                            const next = { ...heartDraft, bank_holder: e.target.value }
+                            setHeartDraft(next)
+                            scheduleHeartSave(heartStaffId, next)
+                          }}
+                          placeholder="예금주"
+                          autoComplete="off"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-base font-semibold text-white/85">계좌번호</label>
+                        <input
+                          className="mt-2 min-h-[52px] w-full rounded-xl border border-white/12 bg-zinc-900 px-4 py-3 text-base text-white outline-none placeholder:text-white/30 focus:border-white/25"
+                          value={heartDraft.bank_account}
+                          onChange={(e) => {
+                            const next = { ...heartDraft, bank_account: e.target.value }
+                            setHeartDraft(next)
+                            scheduleHeartSave(heartStaffId, next)
+                          }}
+                          placeholder="계좌번호"
+                          autoComplete="off"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-base font-semibold text-white/85">메모</label>
+                        <textarea
+                          className="mt-2 min-h-[160px] w-full rounded-xl border border-white/12 bg-zinc-900 px-4 py-4 text-base text-white leading-relaxed outline-none placeholder:text-white/30 focus:border-white/25 resize-y"
+                          value={heartDraft.settlement_traits}
+                          onChange={(e) => {
+                            const next = { ...heartDraft, settlement_traits: e.target.value }
+                            setHeartDraft(next)
+                            scheduleHeartSave(heartStaffId, next)
+                          }}
+                          placeholder="메모를 입력하세요"
+                          autoComplete="off"
+                        />
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
-            </div>
-          )}
+              </div>,
+              document.body
+            )}
         </GlassCard>
       )}
     </div>

@@ -1,8 +1,9 @@
 'use client'
 
-import { useMemo, useRef, useState, type RefObject } from 'react'
+import { useEffect, useMemo, useRef, useState, type RefObject } from 'react'
 import { GlassCard } from '@/components/ui/GlassCard'
 import { cn } from '@/lib/cn'
+import { supabaseClient } from '@/lib/supabaseClient'
 import type { StaffAffiliation, StaffRow, StaffStatus, SortMode } from '../staff-admin.types'
 import { AFFILIATION_LABEL } from '../staff-admin.types'
 
@@ -13,9 +14,16 @@ export type StaffListTabProps = {
   setSortMode: (m: SortMode) => void
   sentinelRef: RefObject<HTMLDivElement | null>
   onStaffDoubleTap: (staffId: string) => void
-  onApplyStatusToStaffs: (staffIds: string[], status: Extract<StaffStatus, 'CHOICE_ING' | 'CHOICE_DONE' | 'CAR_WAIT'>) => Promise<void>
+  onApplyStatusToStaffs: (
+    staffIds: string[],
+    status: Extract<StaffStatus, 'CHOICE_ING' | 'CHOICE_DONE' | 'CAR_WAIT'>,
+    prefill?: { storeId: number; storeName: string; workTime: string }
+  ) => Promise<void>
   isPending: boolean
 }
+
+type StoreRow = { id: number; name: string; is_active: boolean }
+type PrefillRow = { storeId?: number; storeName?: string; workTime?: string }
 
 export function StaffListTab(props: StaffListTabProps) {
   const {
@@ -32,6 +40,13 @@ export function StaffListTab(props: StaffListTabProps) {
   const [affTab, setAffTab] = useState<StaffAffiliation>('GOGO')
   const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [applyingKey, setApplyingKey] = useState<'CHOICE_ING' | 'CHOICE_DONE' | 'CAR_WAIT' | null>(null)
+  const [stores, setStores] = useState<StoreRow[]>([])
+  const [storesLoading, setStoresLoading] = useState(false)
+  const [storeQuery, setStoreQuery] = useState('')
+  const [selectedStoreId, setSelectedStoreId] = useState<number | ''>('')
+  const [storeDropdownOpen, setStoreDropdownOpen] = useState(false)
+  const [workTime, setWorkTime] = useState(getTimeHHMM())
+  const [prefillMap, setPrefillMap] = useState<Record<string, PrefillRow>>({})
   const tapRef = useRef<Record<string, number>>({})
 
   const rowsByAff = useMemo(() => {
@@ -56,6 +71,63 @@ export function StaffListTab(props: StaffListTabProps) {
     return sections
   }, [rowsByAff])
 
+  const filteredStores = useMemo(() => {
+    const q = storeQuery.trim().toLowerCase()
+    const active = stores.filter((s) => s.is_active)
+    if (!q) return active
+    return active
+      .filter((s) => s.name.toLowerCase().includes(q))
+      .sort((a, b) => {
+        const aStarts = a.name.toLowerCase().startsWith(q) ? 0 : 1
+        const bStarts = b.name.toLowerCase().startsWith(q) ? 0 : 1
+        if (aStarts !== bStarts) return aStarts - bStarts
+        return a.name.localeCompare(b.name, 'ko')
+      })
+  }, [stores, storeQuery])
+
+  useEffect(() => {
+    let alive = true
+    setStoresLoading(true)
+    ;(async () => {
+      try {
+        const { data, error } = await supabaseClient.from('stores').select('id, name, is_active').eq('is_active', true).order('name', { ascending: true })
+        if (!alive) return
+        if (error) return
+        setStores((Array.isArray(data) ? data : []) as StoreRow[])
+      } finally {
+        if (alive) setStoresLoading(false)
+      }
+    })()
+    return () => {
+      alive = false
+    }
+  }, [])
+
+  const onPickStore = (s: StoreRow) => {
+    setSelectedStoreId(s.id)
+    setStoreQuery(s.name)
+    setStoreDropdownOpen(false)
+  }
+
+  const refreshPrefillMap = () => {
+    const next: Record<string, PrefillRow> = {}
+    for (const r of visible) {
+      try {
+        const raw = localStorage.getItem(`pc_staff_prefill_${r.id}_v1`)
+        if (!raw) continue
+        const parsed = JSON.parse(raw) as PrefillRow
+        if (!parsed || typeof parsed !== 'object') continue
+        next[r.id] = parsed
+      } catch {}
+    }
+    setPrefillMap(next)
+  }
+
+  useEffect(() => {
+    refreshPrefillMap()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible])
+
   const statusText = (s: StaffStatus | null) => {
     if (!s || s === 'OFF') return '퇴근'
     if (s === 'CHOICE_ING') return '초이스중'
@@ -77,10 +149,25 @@ export function StaffListTab(props: StaffListTabProps) {
 
   const applyStatus = async (status: 'CHOICE_ING' | 'CHOICE_DONE' | 'CAR_WAIT') => {
     if (!selectedIds.length) return
+    if (status !== 'CAR_WAIT') {
+      if (!selectedStoreId) {
+        window.alert('가게를 선택하세요.')
+        return
+      }
+      if (!workTime) {
+        window.alert('시간을 선택하세요.')
+        return
+      }
+    }
     setApplyingKey(status)
     try {
-      await onApplyStatusToStaffs(selectedIds, status)
+      await onApplyStatusToStaffs(
+        selectedIds,
+        status,
+        status === 'CAR_WAIT' ? undefined : { storeId: Number(selectedStoreId), storeName: storeQuery.trim(), workTime }
+      )
       setSelectedIds([])
+      refreshPrefillMap()
     } finally {
       setApplyingKey(null)
     }
@@ -135,6 +222,72 @@ export function StaffListTab(props: StaffListTabProps) {
         </button>
       </div>
 
+      <div className="mt-3 flex flex-row flex-wrap items-end gap-2.5 rounded-lg border border-white/10 bg-black/15 p-2.5">
+        <div className="min-w-0 w-[min(100%,9rem)] shrink-0">
+          <label className="text-[11px] font-medium text-white/75">가게 선택</label>
+          <div className="relative mt-1.5">
+            <input
+              disabled={storesLoading}
+              className={cn(
+                'w-full rounded-lg border border-white/12 bg-black/20 px-2.5 py-2 text-[12px] text-white outline-none placeholder:text-white/30 focus:border-white/25 truncate',
+                storesLoading && 'opacity-70 cursor-not-allowed'
+              )}
+              value={storeQuery}
+              onChange={(e) => {
+                setStoreQuery(e.target.value)
+                setStoreDropdownOpen(true)
+                setSelectedStoreId('')
+              }}
+              onFocus={() => !storesLoading && setStoreDropdownOpen(true)}
+              onBlur={() => window.setTimeout(() => setStoreDropdownOpen(false), 120)}
+              placeholder={storesLoading ? '불러오는 중…' : ''}
+              autoComplete="off"
+            />
+            {!storesLoading && storeDropdownOpen && filteredStores.length > 0 && (
+              <div className={cn('absolute z-20 mt-2 w-full overflow-hidden rounded-xl', 'border border-white/12 bg-zinc-950/95 backdrop-blur-xl shadow-2xl')}>
+                <div className="max-h-52 overflow-y-auto py-1">
+                  {filteredStores.map((s) => (
+                    <button
+                      key={s.id}
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => onPickStore(s)}
+                      className="w-full text-left px-3 py-2.5 hover:bg-white/10 transition"
+                      type="button"
+                    >
+                      <div className="text-[12px] font-semibold text-white">{s.name}</div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="flex-1 min-w-[9.5rem]">
+          <label className="text-[11px] font-medium text-white/75">시간 설정</label>
+          <div className="mt-1.5 flex max-w-full items-center gap-2">
+            <input
+              type="time"
+              className={cn(
+                'w-full min-w-[9.5rem] max-w-full flex-1 rounded-lg border border-white/12 bg-black/20 px-2.5 py-2',
+                'text-[12px] text-white outline-none focus:border-white/25',
+                '[color-scheme:dark]'
+              )}
+              value={workTime}
+              onChange={(e) => setWorkTime(e.target.value)}
+            />
+            <button
+              type="button"
+              onClick={() => setWorkTime(addMinutesToNowHHMM(5))}
+              className="shrink-0 self-stretch rounded-lg border border-white/12 bg-white/5 px-2.5 py-2 text-[11px] font-semibold text-white/80 hover:bg-white/10 transition"
+              title="현재 시각 +5분"
+            >
+              +5
+            </button>
+          </div>
+        </div>
+      </div>
+
       <div className="mt-3 flex gap-2">
         <div className="w-[72px] shrink-0">
           <div className="grid gap-2">
@@ -167,6 +320,7 @@ export function StaffListTab(props: StaffListTabProps) {
                   {section.rows.map((s) => {
                     const selected = selectedIds.includes(s.id)
                     const isOn = s.work_status != null && s.work_status !== 'OFF'
+                    const pre = prefillMap[s.id]
                     return (
                       <button
                         key={s.id}
@@ -183,6 +337,7 @@ export function StaffListTab(props: StaffListTabProps) {
                         <div className={cn('mt-0.5 text-[10px] font-medium', isOn ? 'text-emerald-200/90' : 'text-rose-200/90')}>
                           {statusText(s.work_status)}
                         </div>
+                        <div className="mt-0.5 truncate text-[10px] text-white/50">{pre?.storeName || '-'}</div>
                       </button>
                     )
                   })}
@@ -200,4 +355,19 @@ export function StaffListTab(props: StaffListTabProps) {
       </div>
     </GlassCard>
   )
+}
+
+function getTimeHHMM() {
+  const d = new Date()
+  const hh = String(d.getHours()).padStart(2, '0')
+  const mm = String(d.getMinutes()).padStart(2, '0')
+  return `${hh}:${mm}`
+}
+
+function addMinutesToNowHHMM(addMin: number) {
+  const d = new Date()
+  d.setMinutes(d.getMinutes() + addMin)
+  const hh = String(d.getHours()).padStart(2, '0')
+  const mm = String(d.getMinutes()).padStart(2, '0')
+  return `${hh}:${mm}`
 }

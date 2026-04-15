@@ -23,13 +23,6 @@ const STAFF_STATUS_LABEL: Record<StaffStatus, string> = {
   CHOICE_DONE: '초이스완료',
 }
 
-/** 가게/시작시각 아래 빠른 전환(실시간 저장) */
-const QUICK_WORK_STATUS: { value: StaffStatus; label: string }[] = [
-  { value: 'CHOICE_ING', label: '초이스중' },
-  { value: 'CHOICE_DONE', label: '초이스완료' },
-  { value: 'CAR_WAIT', label: '차대기중' },
-]
-
 const ATT_SUB_STATUSES: StaffStatus[] = ['CHOICE_ING', 'CHOICE_DONE', 'CAR_WAIT']
 
 /** 근태 모달: 퇴근이 아닌 경우 구형 WORKING/LODGE_WAIT → 초이스중으로 맞춤 */
@@ -76,6 +69,7 @@ const BTN_BASE = 'rounded-lg border border-white/12 bg-white/5 text-white/85 hov
 const BTN_ICON = `inline-flex items-center justify-center ${BTN_BASE}`
 const BTN_TEXT_SM = `px-3 py-2 text-[11px] font-semibold ${BTN_BASE}`
 const BTN_SEG = 'rounded-lg border px-3 py-2.5 text-sm font-semibold transition'
+const STAFF_PREFILL_KEY = (staffId: string) => `pc_staff_prefill_${staffId}_v1`
 
 // ------------------ memo versions ------------------
 type JSvcKey = 'NONE' | 'J_HALF' | 'J_ONE' | 'J_ONE_HALF' | 'J_TWO'
@@ -299,7 +293,6 @@ export default function AdminStaffDetailPage() {
   // 근태 모달
   const [attOpen, setAttOpen] = useState(false)
   const [attSaving, setAttSaving] = useState(false)
-  const [workStatusSaving, setWorkStatusSaving] = useState(false)
   const [attStatus, setAttStatus] = useState<StaffStatus>('OFF')
 
   // ✅ 현재 로그인한 관리자 프로필(닉네임) 선로딩
@@ -647,6 +640,27 @@ export default function AdminStaffDetailPage() {
     }
   }, [staffId, selectedYmd])
 
+  /** 직원목록(일괄 상태 설정)에서 저장한 가게/시간 프리셋 반영 */
+  useEffect(() => {
+    if (!staffId) return
+    if (!stores.length) return
+    try {
+      const raw = localStorage.getItem(STAFF_PREFILL_KEY(staffId))
+      if (!raw) return
+      const parsed = JSON.parse(raw) as { storeId?: number; storeName?: string; workTime?: string } | null
+      if (!parsed) return
+      const byId = stores.find((s) => Number(s.id) === Number(parsed.storeId ?? 0))
+      const picked = byId ?? stores.find((s) => s.name === String(parsed.storeName ?? ''))
+      if (picked) {
+        setSelectedStoreId(picked.id)
+        setStoreQuery(picked.name)
+      }
+      if (typeof parsed.workTime === 'string' && /^\d{2}:\d{2}$/.test(parsed.workTime)) {
+        setWorkTime(parsed.workTime)
+      }
+    } catch {}
+  }, [staffId, stores])
+
   useEffect(() => {
     const tick = () => {
       const nowYmd = getKstDateString()
@@ -858,31 +872,6 @@ export default function AdminStaffDetailPage() {
     }
   }
 
-  /** 초이스/차대기 버튼 — 누를 때마다 즉시 DB 반영(저장 후 DB에서 읽어 반영) */
-  const persistQuickWorkStatus = async (next: StaffStatus) => {
-    if (!staffId) return
-    setError(null)
-    setWorkStatusSaving(true)
-    try {
-      const { data, error } = await supabaseClient
-        .from('user_profiles')
-        .update({ work_status: next })
-        .eq('id', staffId)
-        .select('work_status')
-        .single()
-
-      if (error) throw new Error(`상태 저장 실패: ${error.message}`)
-      const saved = (data?.work_status as StaffStatus | null) ?? next
-      setStaff((prev) => (prev ? { ...prev, work_status: saved } : prev))
-      setAttStatus(saved)
-      ssWrite(`pc_staff_${staffId}_v2`, { ts: Date.now(), staff: { ...(staff as Staff), work_status: saved } })
-    } catch (e: any) {
-      setError(e?.message ?? '상태 저장 오류')
-    } finally {
-      setWorkStatusSaving(false)
-    }
-  }
-
   const bumpStartTimePlus5 = () => {
     setWorkTime(addMinutesToNowHHMM(5))
   }
@@ -1027,7 +1016,7 @@ export default function AdminStaffDetailPage() {
               <button
                 type="button"
                 onClick={bumpStartTimePlus5}
-                className="shrink-0 self-stretch rounded-xl border border-white/12 bg-white/5 px-3 py-2 text-[11px] font-semibold text-white/80 hover:bg-white/10 transition"
+                className={cn('shrink-0 self-stretch', BTN_TEXT_SM)}
                 title="현재 시각 +5분"
               >
                 +5
@@ -1035,34 +1024,6 @@ export default function AdminStaffDetailPage() {
             </div>
           </div>
         </div>
-
-        {/* 초이스 / 차대기 — 출근(퇴근 아님)일 때만 표시 · 클릭 시 즉시 저장 */}
-        {isOnShiftStatus((staff?.work_status as StaffStatus | undefined) ?? attStatus) && (
-          <div className="mt-4">
-            <div className="text-xs text-white/45 mb-2">상태 (초이스·차대기)</div>
-            <div className="grid grid-cols-3 gap-2">
-              {QUICK_WORK_STATUS.map(({ value, label }) => {
-                const current = (staff?.work_status as StaffStatus | undefined) ?? attStatus
-                const active = current === value
-                return (
-                  <button
-                    key={value}
-                    type="button"
-                    disabled={workStatusSaving}
-                    onClick={() => persistQuickWorkStatus(value)}
-                    className={cn(
-                      'rounded-xl border px-3 py-2.5 text-sm font-semibold transition',
-                      active ? 'bg-white text-zinc-900 border-white/0' : 'bg-white/5 text-white/85 border-white/12 hover:bg-white/10',
-                      workStatusSaving && 'opacity-70'
-                    )}
-                  >
-                    {label}
-                  </button>
-                )
-              })}
-            </div>
-          </div>
-        )}
 
         {/* ✅ 3x5 버튼 (쌓기) */}
         <div className="mt-4">
@@ -1136,7 +1097,7 @@ export default function AdminStaffDetailPage() {
               <button
                 type="button"
                 onClick={() => moveDay(-1)}
-                className="h-8 w-8 inline-flex items-center justify-center rounded-lg border border-white/12 bg-white/5 text-white/80 hover:bg-white/10 transition"
+                className={cn('h-8 w-8', BTN_ICON)}
                 aria-label="이전날"
               >
                 <ChevronLeft className="h-4 w-4" />
@@ -1145,7 +1106,7 @@ export default function AdminStaffDetailPage() {
               <button
                 type="button"
                 onClick={() => moveDay(+1)}
-                className="h-8 w-8 inline-flex items-center justify-center rounded-lg border border-white/12 bg-white/5 text-white/80 hover:bg-white/10 transition"
+                className={cn('h-8 w-8', BTN_ICON)}
                 aria-label="다음날"
               >
                 <ChevronRight className="h-4 w-4" />
@@ -1222,7 +1183,7 @@ export default function AdminStaffDetailPage() {
                     setDetailOpen(false)
                     setDetail(null)
                   }}
-                  className="rounded-xl border border-white/12 bg-white/5 p-2 text-white/80 hover:bg-white/10 transition"
+                  className={cn('p-2', BTN_ICON)}
                   type="button"
                   aria-label="닫기"
                 >
@@ -1276,7 +1237,7 @@ export default function AdminStaffDetailPage() {
                 </div>
                 <button
                   onClick={() => setAttOpen(false)}
-                  className="rounded-xl border border-white/12 bg-white/5 p-2 text-white/80 hover:bg-white/10 transition"
+                  className={cn('p-2', BTN_ICON)}
                   type="button"
                   aria-label="닫기"
                 >
@@ -1291,7 +1252,7 @@ export default function AdminStaffDetailPage() {
                     if (attStatus === 'OFF') setAttStatus('CHOICE_ING')
                   }}
                   className={cn(
-                    'rounded-xl border px-3 py-3 text-sm font-semibold transition',
+                    BTN_SEG,
                     isOnShiftStatus(attStatus)
                       ? 'bg-white text-zinc-900 border-white/0'
                       : 'bg-white/5 text-white/85 border-white/12 hover:bg-white/10'
@@ -1303,7 +1264,7 @@ export default function AdminStaffDetailPage() {
                   type="button"
                   onClick={() => setAttStatus('OFF')}
                   className={cn(
-                    'rounded-xl border px-3 py-3 text-sm font-semibold transition',
+                    BTN_SEG,
                     attStatus === 'OFF'
                       ? 'bg-white text-zinc-900 border-white/0'
                       : 'bg-white/5 text-white/85 border-white/12 hover:bg-white/10'
@@ -1321,7 +1282,7 @@ export default function AdminStaffDetailPage() {
                       type="button"
                       onClick={() => setAttStatus(s)}
                       className={cn(
-                        'rounded-xl border px-2 py-2.5 text-xs font-semibold transition sm:text-sm',
+                        'rounded-lg border px-2 py-2.5 text-xs font-semibold transition sm:text-sm',
                         attStatus === s ? 'bg-white text-zinc-900 border-white/0' : 'bg-white/5 text-white/85 border-white/12 hover:bg-white/10'
                       )}
                     >
@@ -1408,7 +1369,7 @@ function GridButton({ active, onClick, children }: { active?: boolean; onClick: 
     <button
       onClick={onClick}
       className={cn(
-        'rounded-xl border px-3 py-2.5 text-sm font-semibold transition',
+        BTN_SEG,
         active ? 'bg-white text-zinc-900 border-white/0' : 'bg-white/5 text-white/85 border-white/12 hover:bg-white/10'
       )}
       type="button"
@@ -1427,7 +1388,7 @@ function CountButton({ label, count, onInc, onDec }: { label: string; count: num
         onDec()
       }}
       className={cn(
-        'relative rounded-xl border px-3 py-2.5 text-sm font-semibold transition',
+        'relative rounded-lg border px-3 py-2.5 text-sm font-semibold transition',
         count > 0 ? 'bg-white text-zinc-900 border-white/0' : 'bg-white/5 text-white/85 border-white/12 hover:bg-white/10'
       )}
       type="button"
