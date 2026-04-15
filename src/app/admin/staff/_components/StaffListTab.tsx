@@ -4,8 +4,7 @@ import { useEffect, useMemo, useRef, useState, type RefObject } from 'react'
 import { GlassCard } from '@/components/ui/GlassCard'
 import { cn } from '@/lib/cn'
 import { supabaseClient } from '@/lib/supabaseClient'
-import type { StaffAffiliation, StaffRow, StaffStatus, SortMode } from '../staff-admin.types'
-import { AFFILIATION_LABEL } from '../staff-admin.types'
+import type { StaffRow, StaffStatus, SortMode } from '../staff-admin.types'
 
 export type StaffListTabProps = {
   syncing: boolean
@@ -37,7 +36,6 @@ export function StaffListTab(props: StaffListTabProps) {
     isPending,
   } = props
 
-  const [affTab, setAffTab] = useState<StaffAffiliation>('GOGO')
   const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [applyingKey, setApplyingKey] = useState<'CHOICE_ING' | 'CHOICE_DONE' | 'CAR_WAIT' | null>(null)
   const [stores, setStores] = useState<StoreRow[]>([])
@@ -49,11 +47,11 @@ export function StaffListTab(props: StaffListTabProps) {
   const [prefillMap, setPrefillMap] = useState<Record<string, PrefillRow>>({})
   const tapRef = useRef<Record<string, number>>({})
 
-  const rowsByAff = useMemo(() => {
-    const arr = visible.filter((r) => r.affiliation === affTab)
+  const rowsAll = useMemo(() => {
+    const arr = [...visible]
     arr.sort((a, b) => (a.nickname || '').localeCompare(b.nickname || '', 'ko'))
     return arr
-  }, [visible, affTab])
+  }, [visible])
 
   const rowsByStatusSections = useMemo(() => {
     const sections: Array<{ key: string; label: string; rows: StaffRow[]; tone: string }> = [
@@ -62,21 +60,30 @@ export function StaffListTab(props: StaffListTabProps) {
       { key: 'CHOICE_DONE', label: '초이스완료', rows: [], tone: 'text-emerald-200/90' },
       { key: 'ETC', label: '기타/퇴근', rows: [], tone: 'text-white/65' },
     ]
-    for (const r of rowsByAff) {
+    for (const r of rowsAll) {
       if (r.work_status === 'CHOICE_ING') sections[0].rows.push(r)
       else if (r.work_status === 'CAR_WAIT') sections[1].rows.push(r)
       else if (r.work_status === 'CHOICE_DONE') sections[2].rows.push(r)
       else sections[3].rows.push(r)
     }
     return sections
-  }, [rowsByAff])
+  }, [rowsAll])
 
   const filteredStores = useMemo(() => {
     const q = storeQuery.trim().toLowerCase()
     const active = stores.filter((s) => s.is_active)
     if (!q) return active
+    const qChosung = getChosungSeq(storeQuery.trim())
+    const qIsChosung = isChosungString(storeQuery.trim())
     return active
-      .filter((s) => s.name.toLowerCase().includes(q))
+      .filter((s) => {
+        const name = s.name || ''
+        const nameLower = name.toLowerCase()
+        if (nameLower.includes(q)) return true
+        if (!qIsChosung) return false
+        const nameChosung = getChosungSeq(name)
+        return nameChosung.includes(qChosung)
+      })
       .sort((a, b) => {
         const aStarts = a.name.toLowerCase().startsWith(q) ? 0 : 1
         const bStarts = b.name.toLowerCase().startsWith(q) ? 0 : 1
@@ -286,26 +293,8 @@ export function StaffListTab(props: StaffListTabProps) {
         </div>
       </div>
 
-      <div className="mt-3 flex gap-2">
-        <div className="w-[72px] shrink-0">
-          <div className="grid gap-2">
-            {(['GOGO', 'AONE'] as const).map((aff) => (
-              <button
-                key={aff}
-                type="button"
-                onClick={() => setAffTab(aff)}
-                className={cn(
-                  'rounded-lg border px-2 py-2 text-[11px] font-semibold transition',
-                  affTab === aff ? 'bg-white text-zinc-900 border-white/0' : 'bg-white/5 text-white/80 border-white/12 hover:bg-white/10'
-                )}
-              >
-                {AFFILIATION_LABEL[aff]}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div className="min-w-0 flex-1">
+      <div className="mt-3">
+        <div className="min-w-0">
           {visible.length === 0 && <div className="py-5 text-sm text-white/60">{syncing ? '불러오는 중…' : '직원이 없습니다.'}</div>}
 
           <div className="space-y-2">
@@ -368,4 +357,28 @@ function addMinutesToNowHHMM(addMin: number) {
   const hh = String(d.getHours()).padStart(2, '0')
   const mm = String(d.getMinutes()).padStart(2, '0')
   return `${hh}:${mm}`
+}
+
+const CHOSUNG = ['ㄱ', 'ㄲ', 'ㄴ', 'ㄷ', 'ㄸ', 'ㄹ', 'ㅁ', 'ㅂ', 'ㅃ', 'ㅅ', 'ㅆ', 'ㅇ', 'ㅈ', 'ㅉ', 'ㅊ', 'ㅋ', 'ㅌ', 'ㅍ', 'ㅎ'] as const
+
+function isChosungString(q: string) {
+  if (!q) return false
+  for (const ch of q) if (!(CHOSUNG as readonly string[]).includes(ch)) return false
+  return true
+}
+
+function getChosungSeq(name: string) {
+  let out = ''
+  for (const ch of name) {
+    const c = getChosung(ch)
+    if (c) out += c
+  }
+  return out
+}
+
+function getChosung(ch: string) {
+  const code = ch.charCodeAt(0)
+  if (code < 0xac00 || code > 0xd7a3) return null
+  const index = Math.floor((code - 0xac00) / 588)
+  return (CHOSUNG as readonly string[])[index] ?? null
 }
