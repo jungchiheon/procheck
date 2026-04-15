@@ -4,9 +4,11 @@ import { createClient } from '@supabase/supabase-js'
 export const runtime = 'nodejs'
 
 /**
- * 직원·관리자(user_profiles, auth)는 유지하고,
- * 근무 저장 데이터만 삭제: staff_payment_logs → staff_work_logs 순.
- * 선택적으로 직원 프로필의 일별 정산 처리 상태(settlement_day_status) 초기화.
+ * 관리자 계정은 유지하고, 직원 데이터는 전부 초기화:
+ * - staff_payment_logs / staff_work_logs 삭제
+ * - notifications(직원 호출 등) 삭제
+ * - 직원 user_profiles 삭제
+ * - 직원 auth user 삭제
  */
 export async function POST(req: Request) {
   try {
@@ -53,6 +55,17 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'admin only' }, { status: 403 })
     }
 
+    const { data: staffProfiles, error: staffListErr } = await supabaseService
+      .from('user_profiles')
+      .select('id')
+      .eq('role', 'staff')
+    if (staffListErr) {
+      return NextResponse.json({ error: `직원 목록 조회 실패: ${staffListErr.message}` }, { status: 500 })
+    }
+    const staffIds = (Array.isArray(staffProfiles) ? staffProfiles : [])
+      .map((r) => String((r as { id?: string }).id ?? ''))
+      .filter(Boolean)
+
     const { count: payCountBefore } = await supabaseService
       .from('staff_payment_logs')
       .select('*', { count: 'exact', head: true })
@@ -71,14 +84,37 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: `staff_work_logs 삭제 실패: ${workDelErr.message}` }, { status: 500 })
     }
 
-    let settlementCleared = false
-    const { error: settleErr } = await supabaseService
-      .from('user_profiles')
-      .update({ settlement_day_status: null })
-      .eq('role', 'staff')
+    let notiDeleted = 0
+    if (staffIds.length) {
+      const { count: notiCountBefore } = await supabaseService
+        .from('notifications')
+        .select('*', { count: 'exact', head: true })
+        .in('staff_id', staffIds)
+      const { error: notiDelErr } = await supabaseService.from('notifications').delete().in('staff_id', staffIds)
+      if (notiDelErr) {
+        return NextResponse.json({ error: `notifications 삭제 실패: ${notiDelErr.message}` }, { status: 500 })
+      }
+      notiDeleted = notiCountBefore ?? 0
+    }
 
-    if (!settleErr) {
-      settlementCleared = true
+    let profileDeleted = 0
+    if (staffIds.length) {
+      const { error: profileDelErr } = await supabaseService.from('user_profiles').delete().in('id', staffIds)
+      if (profileDelErr) {
+        return NextResponse.json({ error: `직원 프로필 삭제 실패: ${profileDelErr.message}` }, { status: 500 })
+      }
+      profileDeleted = staffIds.length
+    }
+
+    let authDeleted = 0
+    const authDeleteErrors: string[] = []
+    for (const uid of staffIds) {
+      const { error: authErr } = await supabaseService.auth.admin.deleteUser(uid)
+      if (authErr) {
+        authDeleteErrors.push(`${uid}: ${authErr.message}`)
+      } else {
+        authDeleted += 1
+      }
     }
 
     return NextResponse.json({
@@ -86,11 +122,11 @@ export async function POST(req: Request) {
       deleted: {
         payments: payCountBefore ?? 0,
         workLogs: workCountBefore ?? 0,
+        notifications: notiDeleted,
+        staffProfiles: profileDeleted,
+        staffAuthUsers: authDeleted,
       },
-      settlementDayStatusCleared: settlementCleared,
-      settlementDayStatusNote: settleErr
-        ? `settlement_day_status 초기화 생략: ${settleErr.message}`
-        : undefined,
+      authDeleteErrors: authDeleteErrors.length ? authDeleteErrors : undefined,
     })
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : 'server error'

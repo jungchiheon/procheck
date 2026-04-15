@@ -1,229 +1,203 @@
 'use client'
 
-import type { RefObject } from 'react'
+import { useMemo, useRef, useState, type RefObject } from 'react'
 import { GlassCard } from '@/components/ui/GlassCard'
-import { ProButton } from '@/components/ui/ProButton'
 import { cn } from '@/lib/cn'
-import { X } from 'lucide-react'
-import type { StaffAffiliation, StaffGroup, StaffRow, SortMode } from '../staff-admin.types'
-import { AFFILIATION_LABEL, GROUP_LABEL, GROUP_ORDER } from '../staff-admin.types'
+import type { StaffAffiliation, StaffRow, StaffStatus, SortMode } from '../staff-admin.types'
+import { AFFILIATION_LABEL } from '../staff-admin.types'
 
 export type StaffListTabProps = {
   syncing: boolean
   visible: StaffRow[]
-  grouped: Map<StaffGroup, StaffRow[]>
   sortMode: SortMode
   setSortMode: (m: SortMode) => void
   sentinelRef: RefObject<HTMLDivElement | null>
-  onStaffClick: (staffId: string) => void
+  onStaffDoubleTap: (staffId: string) => void
+  onApplyStatusToStaffs: (staffIds: string[], status: Extract<StaffStatus, 'CHOICE_ING' | 'CHOICE_DONE' | 'CAR_WAIT'>) => Promise<void>
   isPending: boolean
-  sectionTitleClass: (g: StaffGroup) => string
-  open: boolean
-  setOpen: (open: boolean) => void
-  loginId: string
-  setLoginId: (v: string) => void
-  password: string
-  setPassword: (v: string) => void
-  nickname: string
-  setNickname: (v: string) => void
-  createAffiliation: StaffAffiliation
-  setCreateAffiliation: (v: StaffAffiliation) => void
-  onCreate: () => void
-  creating: boolean
 }
 
 export function StaffListTab(props: StaffListTabProps) {
   const {
     syncing,
     visible,
-    grouped,
-    sortMode,
-    setSortMode,
+    sortMode: _sortMode,
+    setSortMode: _setSortMode,
     sentinelRef,
-    onStaffClick,
+    onStaffDoubleTap,
+    onApplyStatusToStaffs,
     isPending,
-    sectionTitleClass,
-    open,
-    setOpen,
-    loginId,
-    setLoginId,
-    password,
-    setPassword,
-    nickname,
-    setNickname,
-    createAffiliation,
-    setCreateAffiliation,
-    onCreate,
-    creating,
   } = props
 
+  const [affTab, setAffTab] = useState<StaffAffiliation>('GOGO')
+  const [selectedIds, setSelectedIds] = useState<string[]>([])
+  const [applyingKey, setApplyingKey] = useState<'CHOICE_ING' | 'CHOICE_DONE' | 'CAR_WAIT' | null>(null)
+  const tapRef = useRef<Record<string, number>>({})
+
+  const rowsByAff = useMemo(() => {
+    const arr = visible.filter((r) => r.affiliation === affTab)
+    arr.sort((a, b) => (a.nickname || '').localeCompare(b.nickname || '', 'ko'))
+    return arr
+  }, [visible, affTab])
+
+  const rowsByStatusSections = useMemo(() => {
+    const sections: Array<{ key: string; label: string; rows: StaffRow[]; tone: string }> = [
+      { key: 'CHOICE_ING', label: '초이스중', rows: [], tone: 'text-sky-200/90' },
+      { key: 'CHOICE_DONE', label: '초이스완료', rows: [], tone: 'text-emerald-200/90' },
+      { key: 'CAR_WAIT', label: '차대기중', rows: [], tone: 'text-amber-200/90' },
+      { key: 'ETC', label: '기타/퇴근', rows: [], tone: 'text-white/65' },
+    ]
+    for (const r of rowsByAff) {
+      if (r.work_status === 'CHOICE_ING') sections[0].rows.push(r)
+      else if (r.work_status === 'CHOICE_DONE') sections[1].rows.push(r)
+      else if (r.work_status === 'CAR_WAIT') sections[2].rows.push(r)
+      else sections[3].rows.push(r)
+    }
+    return sections
+  }, [rowsByAff])
+
+  const statusText = (s: StaffStatus | null) => {
+    if (!s || s === 'OFF') return '퇴근'
+    if (s === 'CHOICE_ING') return '초이스중'
+    if (s === 'CHOICE_DONE') return '초이스완료'
+    if (s === 'CAR_WAIT') return '차대기'
+    return '출근'
+  }
+
+  const toggleSelectOrOpen = (staffId: string) => {
+    const now = Date.now()
+    const prev = tapRef.current[staffId] ?? 0
+    tapRef.current[staffId] = now
+    if (now - prev <= 280) {
+      onStaffDoubleTap(staffId)
+      return
+    }
+    setSelectedIds((prevIds) => (prevIds.includes(staffId) ? prevIds.filter((id) => id !== staffId) : [...prevIds, staffId]))
+  }
+
+  const applyStatus = async (status: 'CHOICE_ING' | 'CHOICE_DONE' | 'CAR_WAIT') => {
+    if (!selectedIds.length) return
+    setApplyingKey(status)
+    try {
+      await onApplyStatusToStaffs(selectedIds, status)
+      setSelectedIds([])
+    } finally {
+      setApplyingKey(null)
+    }
+  }
+
   return (
-    <>
-      <GlassCard className="p-5">
-        <div className="flex items-center justify-between gap-3">
+    <GlassCard className="p-5">
+      <div className="flex items-center justify-between gap-3">
+        <div>
           <div className="text-white font-semibold tracking-tight">직원 목록</div>
+          <div className="mt-0.5 text-[11px] text-white/45">직원 선택 후 상태 버튼 적용 · 더블터치로 상세 이동</div>
+        </div>
+        <div className="text-[11px] text-white/45">{selectedIds.length}명 선택</div>
+      </div>
 
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setSortMode('visit')}
-              className={cn(
-                'rounded-lg px-3 py-1.5 text-sm border transition',
-                sortMode === 'visit' ? 'bg-white text-zinc-900 border-white/0' : 'bg-white/5 text-white/80 border-white/12 hover:bg-white/10'
-              )}
-              type="button"
-            >
-              변경순
-            </button>
-            <button
-              onClick={() => setSortMode('status')}
-              className={cn(
-                'rounded-lg px-3 py-1.5 text-sm border transition',
-                sortMode === 'status' ? 'bg-white text-zinc-900 border-white/0' : 'bg-white/5 text-white/80 border-white/12 hover:bg-white/10'
-              )}
-              type="button"
-            >
-              상태순
-            </button>
+      <div className="mt-3 grid grid-cols-3 gap-2">
+        <button
+          type="button"
+          disabled={!selectedIds.length || applyingKey != null}
+          onClick={() => void applyStatus('CHOICE_ING')}
+          className={cn(
+            'rounded-lg border px-2 py-2 text-[11px] font-bold transition',
+            'border-sky-400/35 bg-sky-500/15 text-sky-100 hover:bg-sky-500/25',
+            (!selectedIds.length || applyingKey != null) && 'opacity-50'
+          )}
+        >
+          {applyingKey === 'CHOICE_ING' ? '처리중…' : '초이스중'}
+        </button>
+        <button
+          type="button"
+          disabled={!selectedIds.length || applyingKey != null}
+          onClick={() => void applyStatus('CHOICE_DONE')}
+          className={cn(
+            'rounded-lg border px-2 py-2 text-[11px] font-bold transition',
+            'border-emerald-400/35 bg-emerald-500/15 text-emerald-100 hover:bg-emerald-500/25',
+            (!selectedIds.length || applyingKey != null) && 'opacity-50'
+          )}
+        >
+          {applyingKey === 'CHOICE_DONE' ? '처리중…' : '초이스완료'}
+        </button>
+        <button
+          type="button"
+          disabled={!selectedIds.length || applyingKey != null}
+          onClick={() => void applyStatus('CAR_WAIT')}
+          className={cn(
+            'rounded-lg border px-2 py-2 text-[11px] font-bold transition',
+            'border-amber-400/35 bg-amber-500/15 text-amber-100 hover:bg-amber-500/25',
+            (!selectedIds.length || applyingKey != null) && 'opacity-50'
+          )}
+        >
+          {applyingKey === 'CAR_WAIT' ? '처리중…' : '차대기중'}
+        </button>
+      </div>
 
-            <ProButton onClick={() => setOpen(true)} type="button" className={cn('!rounded-lg !px-3 !py-1.5 !text-sm !font-semibold !border')}>
-              직원 추가
-            </ProButton>
+      <div className="mt-3 flex gap-2">
+        <div className="w-[72px] shrink-0">
+          <div className="grid gap-2">
+            {(['GOGO', 'AONE'] as const).map((aff) => (
+              <button
+                key={aff}
+                type="button"
+                onClick={() => setAffTab(aff)}
+                className={cn(
+                  'rounded-lg border px-2 py-2 text-[11px] font-semibold transition',
+                  affTab === aff ? 'bg-white text-zinc-900 border-white/0' : 'bg-white/5 text-white/80 border-white/12 hover:bg-white/10'
+                )}
+              >
+                {AFFILIATION_LABEL[aff]}
+              </button>
+            ))}
           </div>
         </div>
 
-        <div className="mt-3">
+        <div className="min-w-0 flex-1">
           {visible.length === 0 && <div className="py-5 text-sm text-white/60">{syncing ? '불러오는 중…' : '직원이 없습니다.'}</div>}
 
-          {GROUP_ORDER.map((g) => {
-            const arr = grouped.get(g) ?? []
-            if (arr.length === 0) return null
-
-            return (
-              <div key={g} className="mt-4 first:mt-0">
-                <div className="flex items-center justify-between">
-                  <div className={cn('text-sm font-semibold', sectionTitleClass(g))}>{GROUP_LABEL[g]}</div>
-                  <div className="text-xs text-white/40">{arr.length}명</div>
+          <div className="space-y-2">
+            {rowsByStatusSections.map((section) => (
+              <div key={section.key} className="rounded-lg border border-white/10 bg-black/10 p-1.5">
+                <div className={cn('px-1 pb-1 text-[10px] font-semibold', section.tone)}>
+                  {section.label} <span className="text-white/35">({section.rows.length})</span>
                 </div>
-
-                <div className="mt-2 divide-y divide-white/10 rounded-2xl border border-white/10 bg-black/10">
-                  {arr.map((s) => {
+                <div className="grid grid-cols-3 gap-1.5 sm:grid-cols-4">
+                  {section.rows.map((s) => {
+                    const selected = selectedIds.includes(s.id)
+                    const isOn = s.work_status != null && s.work_status !== 'OFF'
                     return (
                       <button
                         key={s.id}
-                        onClick={() => onStaffClick(s.id)}
-                        className={cn('w-full text-left rounded-xl transition', 'px-3 py-3 hover:bg-white/5')}
+                        onClick={() => toggleSelectOrOpen(s.id)}
+                        className={cn(
+                          'rounded-lg border px-1.5 py-1.5 text-left transition',
+                          'bg-black/15 hover:bg-white/10',
+                          selected ? 'border-white/55 ring-1 ring-white/40' : 'border-white/12'
+                        )}
                         type="button"
                         disabled={isPending}
                       >
-                        <div className="min-w-0">
-                          <div className="text-white text-sm font-semibold truncate">{s.nickname}</div>
-                          <div className="mt-0.5 text-[11px] text-white/35 truncate">{s.login_id}</div>
-                          {s.affiliation && (
-                            <div className="mt-0.5 text-[11px] text-white/45">{AFFILIATION_LABEL[s.affiliation]}</div>
-                          )}
+                        <div className="truncate text-[11px] font-semibold text-white">{s.nickname}</div>
+                        <div className={cn('mt-0.5 text-[10px] font-medium', isOn ? 'text-emerald-200/90' : 'text-rose-200/90')}>
+                          {statusText(s.work_status)}
                         </div>
                       </button>
                     )
                   })}
                 </div>
               </div>
-            )
-          })}
-
-          <div ref={sentinelRef} className="h-8" />
-        </div>
-      </GlassCard>
-
-      {/* 직원 추가 모달 */}
-      {open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-6">
-          <button className="absolute inset-0 bg-black/60" onClick={() => setOpen(false)} type="button" aria-label="닫기" />
-          <div className="relative w-full max-w-md">
-            <GlassCard className="p-6">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <div className="text-white text-lg font-semibold">직원 추가</div>
-                  <div className="mt-1 text-sm text-white/55">로그인ID/비밀번호/닉네임/소속</div>
-                </div>
-                <button
-                  onClick={() => setOpen(false)}
-                  className="rounded-xl border border-white/12 bg-white/5 p-2 text-white/80 hover:bg-white/10 transition"
-                  type="button"
-                  aria-label="닫기"
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              </div>
-
-              <div className="mt-5 space-y-4">
-                <div>
-                  <label className="text-sm font-medium text-white/80">로그인ID</label>
-                  <input
-                    className="mt-2 w-full rounded-xl border border-white/12 bg-black/20 px-3 py-2.5 text-white outline-none placeholder:text-white/30 focus:border-white/25"
-                    value={loginId}
-                    onChange={(e) => setLoginId(e.target.value)}
-                    placeholder="staff03"
-                    autoComplete="off"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-sm font-medium text-white/80">비밀번호</label>
-                  <input
-                    type="password"
-                    className="mt-2 w-full rounded-xl border border-white/12 bg-black/20 px-3 py-2.5 text-white outline-none placeholder:text-white/30 focus:border-white/25"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="••••••••"
-                    autoComplete="new-password"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-sm font-medium text-white/80">닉네임</label>
-                  <input
-                    className="mt-2 w-full rounded-xl border border-white/12 bg-black/20 px-3 py-2.5 text-white outline-none placeholder:text-white/30 focus:border-white/25"
-                    value={nickname}
-                    onChange={(e) => setNickname(e.target.value)}
-                    placeholder="직원3"
-                    autoComplete="off"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-sm font-medium text-white/80">소속</label>
-                  <div className="mt-2 grid grid-cols-2 gap-2">
-                    {(['AONE', 'GOGO'] as const).map((key) => (
-                      <button
-                        key={key}
-                        type="button"
-                        onClick={() => setCreateAffiliation(key)}
-                        className={cn(
-                          'rounded-xl border px-3 py-2.5 text-sm font-semibold transition',
-                          createAffiliation === key
-                            ? 'bg-white text-zinc-900 border-white/0'
-                            : 'bg-white/5 text-white/85 border-white/12 hover:bg-white/10'
-                        )}
-                      >
-                        {AFFILIATION_LABEL[key]}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="pt-2 flex gap-2">
-                  <ProButton variant="ghost" className="flex-1" onClick={() => setOpen(false)} type="button">
-                    취소
-                  </ProButton>
-                  <ProButton className="flex-1" onClick={onCreate} disabled={creating} type="button">
-                    {creating ? '생성 중...' : '생성'}
-                  </ProButton>
-                </div>
-              </div>
-            </GlassCard>
+            ))}
           </div>
         </div>
-      )}
-    </>
+      </div>
+
+      <div className="mt-1">
+        {visible.length === 0 && <div className="py-5 text-sm text-white/60">{syncing ? '불러오는 중…' : '직원이 없습니다.'}</div>}
+
+        <div ref={sentinelRef} className="h-8" />
+      </div>
+    </GlassCard>
   )
 }

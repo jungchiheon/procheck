@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import { createPortal } from 'react-dom'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { supabaseClient } from '@/lib/supabaseClient'
 import { GlassCard } from '@/components/ui/GlassCard'
 import { PageHeader } from '@/components/ui/PageHeader'
@@ -65,6 +65,7 @@ const groupRank = (g: StaffGroup) => GROUP_ORDER.indexOf(g)
 
 export default function AdminStaffPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [isPending, startTransition] = useTransition()
 
   const [tab, setTab] = useState<TabKey>('staff')
@@ -86,6 +87,8 @@ export default function AdminStaffPage() {
   const [nickname, setNickname] = useState('')
   const [createAffiliation, setCreateAffiliation] = useState<StaffAffiliation>('AONE')
   const [creating, setCreating] = useState(false)
+  const [attAffTab, setAttAffTab] = useState<StaffAffiliation>('AONE')
+  const [attToggleBusyId, setAttToggleBusyId] = useState<string | null>(null)
 
   // 점진 렌더
   const [renderCount, setRenderCount] = useState(PAGE_CHUNK)
@@ -272,6 +275,15 @@ export default function AdminStaffPage() {
     markVisitedIdle(staffId)
   }
 
+  const onApplyStatusToStaffs = async (staffIds: string[], status: Extract<StaffStatus, 'CHOICE_ING' | 'CHOICE_DONE' | 'CAR_WAIT'>) => {
+    if (!staffIds.length) return
+    setError(null)
+    const uniq = Array.from(new Set(staffIds.filter(Boolean)))
+    const { error } = await supabaseClient.from('user_profiles').update({ work_status: status }).in('id', uniq)
+    if (error) throw new Error(`근태 일괄 변경 실패: ${error.message}`)
+    setRows((prev) => prev.map((r) => (uniq.includes(r.id) ? { ...r, work_status: status } : r)))
+  }
+
   // 직원 추가
   const onCreate = async () => {
     setError(null)
@@ -320,16 +332,47 @@ export default function AdminStaffPage() {
     }
   }
 
+  const isOnShift = (s: StaffStatus | null | undefined) => Boolean(s && s !== 'OFF')
+
+  const onToggleAttendanceFromMain = async (staff: StaffRow) => {
+    const next: StaffStatus = isOnShift(staff.work_status) ? 'OFF' : 'CHOICE_ING'
+    setAttToggleBusyId(staff.id)
+    setError(null)
+    try {
+      const { data, error } = await supabaseClient
+        .from('user_profiles')
+        .update({ work_status: next })
+        .eq('id', staff.id)
+        .select('work_status')
+        .single()
+      if (error) throw new Error(`근태 변경 실패: ${error.message}`)
+
+      const saved = ((data?.work_status as StaffStatus | null) ?? next) as StaffStatus
+      setRows((prev) => prev.map((r) => (r.id === staff.id ? { ...r, work_status: saved } : r)))
+      setVisitMap((prev) => {
+        const nextMap = { ...prev, [staff.id]: Date.now() }
+        try {
+          localStorage.setItem(VISIT_KEY, JSON.stringify(nextMap))
+        } catch {}
+        return nextMap
+      })
+    } catch (e: any) {
+      setError(e?.message ?? '근태 변경 오류')
+    } finally {
+      setAttToggleBusyId(null)
+    }
+  }
+
   const onLogout = async () => {
     await supabaseClient.auth.signOut()
     router.replace('/login')
   }
 
-  /** 근무·정산 저장 테이블만 비움 (직원·관리자 프로필·계정 유지) */
+  /** 관리자 유지, 직원 데이터 전체 초기화 */
   const onResetWorkData = async () => {
     if (
       !window.confirm(
-        '데이터를 삭제하시겠습니까?'
+        '직원 데이터를 전체 초기화합니다.\n\n직원 계정(auth) + 직원 프로필(user_profiles) + 근무/정산/호출 알림 내역이 모두 삭제됩니다.\n관리자 계정은 유지됩니다.\n\n계속할까요?'
 
       )
     )
@@ -349,16 +392,16 @@ export default function AdminStaffPage() {
       })
       const json = (await res.json().catch(() => ({}))) as {
         error?: string
-        deleted?: { payments?: number; workLogs?: number }
-        settlementDayStatusCleared?: boolean
-        settlementDayStatusNote?: string
+        deleted?: { payments?: number; workLogs?: number; notifications?: number; staffProfiles?: number; staffAuthUsers?: number }
+        authDeleteErrors?: string[]
       }
       if (!res.ok) throw new Error(json?.error || '초기화 실패')
 
       const d = json.deleted
-      let msg = `초기화 완료: 정산(결제) 로그 ${d?.payments ?? 0}건, 근무 로그 ${d?.workLogs ?? 0}건 삭제.`
-      if (json.settlementDayStatusCleared) msg += ' 일별 정산 처리 상태 초기화됨.'
-      if (json.settlementDayStatusNote) msg += `\n${json.settlementDayStatusNote}`
+      let msg = `초기화 완료:\n- 직원 auth 계정 ${d?.staffAuthUsers ?? 0}건\n- 직원 프로필 ${d?.staffProfiles ?? 0}건\n- 정산(결제) 로그 ${d?.payments ?? 0}건\n- 근무 로그 ${d?.workLogs ?? 0}건\n- 호출 알림 ${d?.notifications ?? 0}건 삭제`
+      if (json.authDeleteErrors?.length) {
+        msg += `\n\n일부 auth 삭제 실패:\n${json.authDeleteErrors.slice(0, 5).join('\n')}`
+      }
       window.alert(msg)
       window.location.reload()
     } catch (e: unknown) {
@@ -370,14 +413,16 @@ export default function AdminStaffPage() {
 
   const visible = ordered.slice(0, renderCount)
 
-  const grouped = useMemo(() => {
-    const map = new Map<StaffGroup, StaffRow[]>()
-    for (const g of GROUP_ORDER) map.set(g, [])
-    for (const r of visible) map.get(groupOfRow(r))!.push(r)
-    return map
-  }, [visible])
-
-  const sectionTitleClass = (g: StaffGroup) => (g === 'ON' ? 'text-emerald-100' : 'text-red-100')
+  const affiliationStaffRows = useMemo(() => {
+    const arr = rows.filter((r) => r.affiliation === attAffTab)
+    arr.sort((a, b) => {
+      const aOn = isOnShift(a.work_status) ? 0 : 1
+      const bOn = isOnShift(b.work_status) ? 0 : 1
+      if (aOn !== bOn) return aOn - bOn
+      return (a.nickname || '').localeCompare(b.nickname || '', 'ko')
+    })
+    return arr
+  }, [rows, attAffTab])
 
   /* ------------------------- 미수 관리 ------------------------- */
   const loadMisu = async (opts?: { force?: boolean; silent?: boolean }) => {
@@ -932,6 +977,19 @@ export default function AdminStaffPage() {
   }, [heartStaffId, heartDraft, flushHeartSave])
 
   useEffect(() => {
+    const panel = searchParams.get('panel')
+    if (panel === 'create') {
+      setTab('staff')
+      setOpen(true)
+      return
+    }
+    if (panel === 'attendance') {
+      setTab('attendance')
+      setOpen(false)
+    }
+  }, [searchParams])
+
+  useEffect(() => {
     if (tab !== 'settle') return
     const ids = new Set(settleStaffBlocks.map((b) => b.staffId))
     if (ids.size === 0) return
@@ -988,12 +1046,12 @@ export default function AdminStaffPage() {
       />
 
       {/* 탭 */}
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-1.5 overflow-x-auto whitespace-nowrap pr-1 [scrollbar-width:none]">
         <button
           type="button"
           onClick={() => setTab('staff')}
           className={cn(
-            'rounded-xl border px-4 py-2 text-sm font-semibold transition',
+            'rounded-lg border px-3 py-1.5 text-xs font-semibold transition',
             tab === 'staff' ? 'border-white/12 bg-white/10 text-white' : 'border-white/12 bg-white/5 text-white/70 hover:bg-white/10'
           )}
         >
@@ -1004,7 +1062,7 @@ export default function AdminStaffPage() {
           type="button"
           onClick={() => setTab('misu')}
           className={cn(
-            'rounded-xl border px-4 py-2 text-sm font-semibold transition',
+            'rounded-lg border px-3 py-1.5 text-xs font-semibold transition',
             tab === 'misu' ? 'border-white/12 bg-white/10 text-white' : 'border-white/12 bg-white/5 text-white/70 hover:bg-white/10'
           )}
         >
@@ -1015,7 +1073,7 @@ export default function AdminStaffPage() {
           type="button"
           onClick={() => setTab('settle')}
           className={cn(
-            'rounded-xl border px-4 py-2 text-sm font-semibold transition',
+            'rounded-lg border px-3 py-1.5 text-xs font-semibold transition',
             tab === 'settle' ? 'border-white/12 bg-white/10 text-white' : 'border-white/12 bg-white/5 text-white/70 hover:bg-white/10'
           )}
         >
@@ -1029,7 +1087,7 @@ export default function AdminStaffPage() {
           title="근무·정산 저장 데이터 초기화 (계정·직원 목록은 유지)"
           aria-label="근무·정산 저장 데이터 초기화"
           className={cn(
-            'inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border transition',
+            'inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border transition',
             'border-red-400/35 bg-red-500/10 text-red-100 hover:bg-red-500/20 disabled:opacity-50 active:scale-[0.98]'
           )}
         >
@@ -1048,29 +1106,163 @@ export default function AdminStaffPage() {
 
       {/* ------------------------- 직원 관리 탭 ------------------------- */}
       {tab === 'staff' && (
-        <StaffListTab
-          syncing={syncing}
-          visible={visible}
-          grouped={grouped}
-          sortMode={sortMode}
-          setSortMode={setSortMode}
-          sentinelRef={sentinelRef}
-          onStaffClick={onStaffRowClick}
-          isPending={isPending}
-          sectionTitleClass={sectionTitleClass}
-          open={open}
-          setOpen={setOpen}
-          loginId={loginId}
-          setLoginId={setLoginId}
-          password={password}
-          setPassword={setPassword}
-          nickname={nickname}
-          setNickname={setNickname}
-          createAffiliation={createAffiliation}
-          setCreateAffiliation={setCreateAffiliation}
-          onCreate={onCreate}
-          creating={creating}
-        />
+        <>
+          <StaffListTab
+            syncing={syncing}
+            visible={visible}
+            sortMode={sortMode}
+            setSortMode={setSortMode}
+            sentinelRef={sentinelRef}
+            onStaffDoubleTap={onStaffRowClick}
+            onApplyStatusToStaffs={onApplyStatusToStaffs}
+            isPending={isPending}
+          />
+
+          {/* 직원 추가 모달 (기능 이동) */}
+          {open && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-6">
+              <button className="absolute inset-0 bg-black/60" onClick={() => setOpen(false)} type="button" aria-label="닫기" />
+              <div className="relative w-full max-w-md">
+                <GlassCard className="p-6">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <div className="text-white text-lg font-semibold">직원 추가</div>
+                      <div className="mt-1 text-sm text-white/55">로그인ID/비밀번호/닉네임/소속</div>
+                    </div>
+                    <button
+                      onClick={() => setOpen(false)}
+                      className="rounded-xl border border-white/12 bg-white/5 p-2 text-white/80 hover:bg-white/10 transition"
+                      type="button"
+                      aria-label="닫기"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+
+                  <div className="mt-5 space-y-4">
+                    <div>
+                      <label className="text-sm font-medium text-white/80">로그인ID</label>
+                      <input
+                        className="mt-2 w-full rounded-xl border border-white/12 bg-black/20 px-3 py-2.5 text-white outline-none placeholder:text-white/30 focus:border-white/25"
+                        value={loginId}
+                        onChange={(e) => setLoginId(e.target.value)}
+                        placeholder="staff03"
+                        autoComplete="off"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-sm font-medium text-white/80">비밀번호</label>
+                      <input
+                        type="password"
+                        className="mt-2 w-full rounded-xl border border-white/12 bg-black/20 px-3 py-2.5 text-white outline-none placeholder:text-white/30 focus:border-white/25"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        placeholder="••••••••"
+                        autoComplete="new-password"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-sm font-medium text-white/80">닉네임</label>
+                      <input
+                        className="mt-2 w-full rounded-xl border border-white/12 bg-black/20 px-3 py-2.5 text-white outline-none placeholder:text-white/30 focus:border-white/25"
+                        value={nickname}
+                        onChange={(e) => setNickname(e.target.value)}
+                        placeholder="직원3"
+                        autoComplete="off"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-sm font-medium text-white/80">소속</label>
+                      <div className="mt-2 grid grid-cols-2 gap-2">
+                        {(['AONE', 'GOGO'] as const).map((key) => (
+                          <button
+                            key={key}
+                            type="button"
+                            onClick={() => setCreateAffiliation(key)}
+                            className={cn(
+                              'rounded-xl border px-3 py-2.5 text-sm font-semibold transition',
+                              createAffiliation === key
+                                ? 'bg-white text-zinc-900 border-white/0'
+                                : 'bg-white/5 text-white/85 border-white/12 hover:bg-white/10'
+                            )}
+                          >
+                            {key === 'AONE' ? '에이원' : '고고'}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="pt-2 flex gap-2">
+                      <ProButton variant="ghost" className="flex-1" onClick={() => setOpen(false)} type="button">
+                        취소
+                      </ProButton>
+                      <ProButton className="flex-1" onClick={onCreate} disabled={creating} type="button">
+                        {creating ? '생성 중...' : '생성'}
+                      </ProButton>
+                    </div>
+                  </div>
+                </GlassCard>
+              </div>
+            </div>
+          )}
+
+        </>
+      )}
+
+      {/* ------------------------- 근태 관리 탭 ------------------------- */}
+      {tab === 'attendance' && (
+        <GlassCard className="overflow-hidden p-0">
+          <div className="border-b border-white/10 bg-black/25 px-3 py-2.5 sm:px-4">
+            <div className="text-sm font-bold tracking-tight text-white">직원 근태관리</div>
+            <div className="mt-0.5 text-[11px] text-white/45">직원을 누르면 출근/퇴근이 즉시 반영됩니다.</div>
+          </div>
+
+          <div className="p-3 sm:p-4">
+            <div className="grid grid-cols-2 gap-2">
+              {(['AONE', 'GOGO'] as const).map((k) => (
+                <button
+                  key={k}
+                  type="button"
+                  onClick={() => setAttAffTab(k)}
+                  className={cn(
+                    'rounded-lg border px-3 py-2 text-sm font-semibold transition',
+                    attAffTab === k ? 'bg-white text-zinc-900 border-white/0' : 'bg-white/5 text-white/85 border-white/12 hover:bg-white/10'
+                  )}
+                >
+                  {k === 'AONE' ? '에이원' : '고고'}
+                </button>
+              ))}
+            </div>
+
+            <div className="mt-3 grid grid-cols-4 gap-2">
+              {affiliationStaffRows.map((s) => {
+                const on = isOnShift(s.work_status)
+                const busy = attToggleBusyId === s.id
+                return (
+                  <button
+                    key={s.id}
+                    type="button"
+                    disabled={busy}
+                    onClick={() => void onToggleAttendanceFromMain(s)}
+                    className={cn(
+                      'rounded-lg border px-2 py-2 text-[11px] font-semibold leading-tight transition',
+                      on
+                        ? 'border-emerald-400/35 bg-emerald-500/18 text-emerald-100 hover:bg-emerald-500/25'
+                        : 'border-rose-400/35 bg-rose-500/16 text-rose-100 hover:bg-rose-500/22',
+                      busy && 'opacity-60'
+                    )}
+                  >
+                    <div className="truncate">{s.nickname}</div>
+                    <div className={cn('mt-0.5 text-[10px]', on ? 'text-emerald-200/85' : 'text-rose-200/85')}>{on ? '출근' : '퇴근'}</div>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        </GlassCard>
       )}
 
       {/* ------------------------- 미수 관리 탭 ------------------------- */}

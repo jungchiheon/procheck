@@ -7,7 +7,7 @@ export const AFFILIATION_LABEL: Record<StaffAffiliation, string> = {
 }
 
 export type StaffGroup = 'ON' | 'OFF'
-export type TabKey = 'staff' | 'misu' | 'settle'
+export type TabKey = 'staff' | 'attendance' | 'misu' | 'settle'
 
 export const GROUP_LABEL: Record<StaffGroup, string> = { ON: '출근', OFF: '퇴근' }
 export const GROUP_ORDER: StaffGroup[] = ['ON', 'OFF']

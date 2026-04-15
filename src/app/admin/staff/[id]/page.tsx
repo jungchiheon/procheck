@@ -7,7 +7,7 @@ import { GlassCard } from '@/components/ui/GlassCard'
 import { PageHeader } from '@/components/ui/PageHeader'
 import { ProButton } from '@/components/ui/ProButton'
 import { cn } from '@/lib/cn'
-import { Save, Trash2, ChevronLeft, ChevronRight, X, UserCheck } from 'lucide-react'
+import { Save, Trash2, ChevronLeft, ChevronRight, X } from 'lucide-react'
 import { MISU_MARK } from '../staff-admin.types'
 import { v5DisplayLineFromTokens } from '../staff-admin.utils'
 
@@ -71,6 +71,11 @@ type PaymentRow = { amount: number | null; memo: string | null; method: string |
 
 // ✅ 누가 저장했는지(관리자)
 type SavedBy = { id: string; login_id: string; nickname: string; at: string }
+
+const BTN_BASE = 'rounded-lg border border-white/12 bg-white/5 text-white/85 hover:bg-white/10 transition'
+const BTN_ICON = `inline-flex items-center justify-center ${BTN_BASE}`
+const BTN_TEXT_SM = `px-3 py-2 text-[11px] font-semibold ${BTN_BASE}`
+const BTN_SEG = 'rounded-lg border px-3 py-2.5 text-sm font-semibold transition'
 
 // ------------------ memo versions ------------------
 type JSvcKey = 'NONE' | 'J_HALF' | 'J_ONE' | 'J_ONE_HALF' | 'J_TWO'
@@ -945,23 +950,6 @@ export default function AdminStaffDetailPage() {
         backHref="/admin/staff"
         right={
           <div className="flex items-center gap-2">
-            <button
-              onClick={() => {
-                setAttStatus(normalizeAttForModal(((staff?.work_status as StaffStatus) ?? 'OFF') as StaffStatus))
-                setAttOpen(true)
-              }}
-              className={cn(
-                'inline-flex items-center justify-center',
-                'h-10 w-10 rounded-xl border border-white/12 bg-white/5',
-                'text-white/85 hover:bg-white/10 transition'
-              )}
-              type="button"
-              aria-label="근태"
-              title="근태"
-            >
-              <UserCheck className="h-5 w-5" />
-            </button>
-
             <ProButton variant="ghost" onClick={onLogout}>
               로그아웃
             </ProButton>
