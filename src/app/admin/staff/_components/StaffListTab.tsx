@@ -58,14 +58,14 @@ export function StaffListTab(props: StaffListTabProps) {
   const rowsByStatusSections = useMemo(() => {
     const sections: Array<{ key: string; label: string; rows: StaffRow[]; tone: string }> = [
       { key: 'CHOICE_ING', label: '초이스중', rows: [], tone: 'text-sky-200/90' },
-      { key: 'CHOICE_DONE', label: '초이스완료', rows: [], tone: 'text-emerald-200/90' },
       { key: 'CAR_WAIT', label: '차대기중', rows: [], tone: 'text-amber-200/90' },
+      { key: 'CHOICE_DONE', label: '초이스완료', rows: [], tone: 'text-emerald-200/90' },
       { key: 'ETC', label: '기타/퇴근', rows: [], tone: 'text-white/65' },
     ]
     for (const r of rowsByAff) {
       if (r.work_status === 'CHOICE_ING') sections[0].rows.push(r)
-      else if (r.work_status === 'CHOICE_DONE') sections[1].rows.push(r)
-      else if (r.work_status === 'CAR_WAIT') sections[2].rows.push(r)
+      else if (r.work_status === 'CAR_WAIT') sections[1].rows.push(r)
+      else if (r.work_status === 'CHOICE_DONE') sections[2].rows.push(r)
       else sections[3].rows.push(r)
     }
     return sections
@@ -176,10 +176,6 @@ export function StaffListTab(props: StaffListTabProps) {
   return (
     <GlassCard className="p-5">
       <div className="flex items-center justify-between gap-3">
-        <div>
-          <div className="text-white font-semibold tracking-tight">직원 목록</div>
-          <div className="mt-0.5 text-[11px] text-white/45">직원 선택 후 상태 버튼 적용 · 더블터치로 상세 이동</div>
-        </div>
         <div className="text-[11px] text-white/45">{selectedIds.length}명 선택</div>
       </div>
 
@@ -222,8 +218,9 @@ export function StaffListTab(props: StaffListTabProps) {
         </button>
       </div>
 
-      <div className="mt-3 flex flex-row flex-wrap items-end gap-2.5 rounded-lg border border-white/10 bg-black/15 p-2.5">
-        <div className="min-w-0 w-[min(100%,9rem)] shrink-0">
+      <div className="mt-3 overflow-x-auto rounded-lg border border-white/10 bg-black/15 p-2.5 [scrollbar-width:none]">
+        <div className="flex min-w-[29rem] flex-nowrap items-end gap-2.5">
+        <div className="w-[8.75rem] shrink-0">
           <label className="text-[11px] font-medium text-white/75">가게 선택</label>
           <div className="relative mt-1.5">
             <input
@@ -263,13 +260,13 @@ export function StaffListTab(props: StaffListTabProps) {
           </div>
         </div>
 
-        <div className="flex-1 min-w-[9.5rem]">
+        <div className="min-w-0 flex-1">
           <label className="text-[11px] font-medium text-white/75">시간 설정</label>
-          <div className="mt-1.5 flex max-w-full items-center gap-2">
+          <div className="mt-1.5 flex flex-nowrap items-center gap-1.5">
             <input
               type="time"
               className={cn(
-                'w-full min-w-[9.5rem] max-w-full flex-1 rounded-lg border border-white/12 bg-black/20 px-2.5 py-2',
+                'w-[7.1rem] min-w-0 shrink-0 rounded-lg border border-white/12 bg-black/20 px-2 py-2',
                 'text-[12px] text-white outline-none focus:border-white/25',
                 '[color-scheme:dark]'
               )}
@@ -279,12 +276,13 @@ export function StaffListTab(props: StaffListTabProps) {
             <button
               type="button"
               onClick={() => setWorkTime(addMinutesToNowHHMM(5))}
-              className="shrink-0 self-stretch rounded-lg border border-white/12 bg-white/5 px-2.5 py-2 text-[11px] font-semibold text-white/80 hover:bg-white/10 transition"
+              className="h-[34px] w-[40px] shrink-0 rounded-lg border border-white/12 bg-white/5 px-0 py-0 text-[11px] font-semibold text-white/80 hover:bg-white/10 transition"
               title="현재 시각 +5분"
             >
               +5
             </button>
           </div>
+        </div>
         </div>
       </div>
 

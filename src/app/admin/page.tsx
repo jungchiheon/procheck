@@ -1,7 +1,7 @@
 // src/app/admin/page.tsx
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabaseClient } from '@/lib/supabaseClient'
 import { GlassCard } from '@/components/ui/GlassCard'
@@ -13,7 +13,15 @@ import { Users, Store, UserPlus, UserCheck, X } from 'lucide-react'
 
 type Aff = 'AONE' | 'GOGO'
 type StaffStatus = 'WORKING' | 'CAR_WAIT' | 'LODGE_WAIT' | 'OFF' | 'CHOICE_ING' | 'CHOICE_DONE'
-type StaffLite = { id: string; nickname: string; affiliation: Aff | null; work_status: StaffStatus | null; role: string; is_active: boolean }
+type StaffLite = {
+  id: string
+  login_id: string | null
+  nickname: string
+  affiliation: Aff | null
+  work_status: StaffStatus | null
+  role: string
+  is_active: boolean
+}
 
 export default function AdminHomePage() {
   const router = useRouter()
@@ -23,6 +31,11 @@ export default function AdminHomePage() {
   const [attLoading, setAttLoading] = useState(false)
   const [attBusyId, setAttBusyId] = useState<string | null>(null)
   const [attError, setAttError] = useState<string | null>(null)
+  const [editTarget, setEditTarget] = useState<StaffLite | null>(null)
+  const [editNickname, setEditNickname] = useState('')
+  const [editAff, setEditAff] = useState<Aff>('AONE')
+  const [editSaving, setEditSaving] = useState(false)
+  const tapRef = useRef<Record<string, number>>({})
 
   const onLogout = async () => {
     await supabaseClient.auth.signOut()
@@ -37,7 +50,7 @@ export default function AdminHomePage() {
     try {
       const { data, error } = await supabaseClient
         .from('user_profiles')
-        .select('id, nickname, affiliation, work_status, role, is_active')
+        .select('id, login_id, nickname, affiliation, work_status, role, is_active')
         .eq('role', 'staff')
         .eq('is_active', true)
       if (error) throw new Error(`근태 목록 조회 실패: ${error.message}`)
@@ -72,6 +85,47 @@ export default function AdminHomePage() {
       setAttError(e?.message ?? '근태 변경 오류')
     } finally {
       setAttBusyId(null)
+    }
+  }
+
+  const openEdit = (row: StaffLite) => {
+    setEditTarget(row)
+    setEditNickname(row.nickname ?? '')
+    setEditAff((row.affiliation === 'GOGO' ? 'GOGO' : 'AONE') as Aff)
+  }
+
+  const onTapStaff = (row: StaffLite) => {
+    const now = Date.now()
+    const prev = tapRef.current[row.id] ?? 0
+    tapRef.current[row.id] = now
+    if (now - prev <= 280) {
+      openEdit(row)
+      return
+    }
+    void onToggleAttendance(row)
+  }
+
+  const onSaveEdit = async () => {
+    if (!editTarget) return
+    setEditSaving(true)
+    setAttError(null)
+    try {
+      const nick = editNickname.trim()
+      if (!nick) throw new Error('닉네임을 입력하세요.')
+      const { data, error } = await supabaseClient
+        .from('user_profiles')
+        .update({ nickname: nick, affiliation: editAff })
+        .eq('id', editTarget.id)
+        .select('id, login_id, nickname, affiliation, work_status, role, is_active')
+        .single()
+      if (error) throw new Error(`직원정보 수정 실패: ${error.message}`)
+      const saved = data as StaffLite
+      setAttRows((prev) => prev.map((x) => (x.id === saved.id ? { ...x, ...saved } : x)))
+      setEditTarget(null)
+    } catch (e: any) {
+      setAttError(e?.message ?? '직원정보 수정 오류')
+    } finally {
+      setEditSaving(false)
     }
   }
 
@@ -180,7 +234,7 @@ export default function AdminHomePage() {
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <div className="text-white text-base font-semibold">직원 근태관리</div>
-                  <div className="mt-1 text-xs text-white/50">고고/에이원 탭에서 직원을 눌러 출퇴근을 토글하세요.</div>
+                  <div className="mt-1 text-xs text-white/50">직원수정시 더블클릭</div>
                 </div>
                 <button
                   onClick={() => setAttOpen(false)}
@@ -221,7 +275,7 @@ export default function AdminHomePage() {
                         key={s.id}
                         type="button"
                         disabled={busy}
-                        onClick={() => void onToggleAttendance(s)}
+                        onClick={() => onTapStaff(s)}
                         className={cn(
                           'rounded-lg border px-2 py-2 text-[11px] font-semibold leading-tight transition',
                           on
@@ -237,6 +291,70 @@ export default function AdminHomePage() {
                   })}
                 </div>
               )}
+            </GlassCard>
+          </div>
+        </div>
+      )}
+
+      {editTarget && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 sm:p-6">
+          <button className="absolute inset-0 bg-black/60" type="button" aria-label="닫기" onClick={() => setEditTarget(null)} />
+          <div className="relative w-full max-w-sm">
+            <GlassCard className="p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="text-white text-base font-semibold">직원정보수정</div>
+                  <div className="mt-1 text-xs text-white/45 truncate">{editTarget.login_id || '-'}</div>
+                </div>
+                <button
+                  onClick={() => setEditTarget(null)}
+                  className="rounded-lg border border-white/12 bg-white/5 p-2 text-white/80 hover:bg-white/10 transition"
+                  type="button"
+                  aria-label="닫기"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+
+              <div className="mt-4 space-y-3">
+                <div>
+                  <label className="text-xs font-medium text-white/75">닉네임</label>
+                  <input
+                    className="mt-1.5 w-full rounded-lg border border-white/12 bg-black/20 px-3 py-2 text-sm text-white outline-none placeholder:text-white/30 focus:border-white/25"
+                    value={editNickname}
+                    onChange={(e) => setEditNickname(e.target.value)}
+                    placeholder="닉네임"
+                    autoComplete="off"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-white/75">소속</label>
+                  <div className="mt-1.5 grid grid-cols-2 gap-2">
+                    {(['AONE', 'GOGO'] as const).map((k) => (
+                      <button
+                        key={k}
+                        type="button"
+                        onClick={() => setEditAff(k)}
+                        className={cn(
+                          'rounded-lg border px-3 py-2 text-sm font-semibold transition',
+                          editAff === k ? 'bg-white text-zinc-900 border-white/0' : 'bg-white/5 text-white/85 border-white/12 hover:bg-white/10'
+                        )}
+                      >
+                        {k === 'AONE' ? '에이원' : '고고'}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-4 flex gap-2">
+                <ProButton variant="ghost" className="flex-1" type="button" onClick={() => setEditTarget(null)} disabled={editSaving}>
+                  취소
+                </ProButton>
+                <ProButton className="flex-1" type="button" onClick={() => void onSaveEdit()} disabled={editSaving}>
+                  {editSaving ? '저장 중...' : '저장'}
+                </ProButton>
+              </div>
             </GlassCard>
           </div>
         </div>

@@ -1159,7 +1159,6 @@ export default function AdminStaffPage() {
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <div className="text-white text-lg font-semibold">직원 추가</div>
-                      <div className="mt-1 text-sm text-white/55">로그인ID/비밀번호/닉네임/소속</div>
                     </div>
                     <button
                       onClick={() => setOpen(false)}
@@ -1178,7 +1177,7 @@ export default function AdminStaffPage() {
                         className="mt-2 w-full rounded-xl border border-white/12 bg-black/20 px-3 py-2.5 text-white outline-none placeholder:text-white/30 focus:border-white/25"
                         value={loginId}
                         onChange={(e) => setLoginId(e.target.value)}
-                        placeholder="staff03"
+                        placeholder="ID"
                         autoComplete="off"
                       />
                     </div>
@@ -1201,7 +1200,7 @@ export default function AdminStaffPage() {
                         className="mt-2 w-full rounded-xl border border-white/12 bg-black/20 px-3 py-2.5 text-white outline-none placeholder:text-white/30 focus:border-white/25"
                         value={nickname}
                         onChange={(e) => setNickname(e.target.value)}
-                        placeholder="직원3"
+                        placeholder="직원"
                         autoComplete="off"
                       />
                     </div>

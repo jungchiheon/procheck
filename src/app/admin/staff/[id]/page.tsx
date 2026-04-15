@@ -354,6 +354,17 @@ export default function AdminStaffDetailPage() {
     pushToken({ t: 'TIP', amount: a })
   }
 
+  const addTipFromPrompt = () => {
+    const raw = window.prompt('팁 금액을 입력하세요 (원)', '')
+    if (!raw) return
+    const n = Number(String(raw).replace(/[^\d.-]/g, ''))
+    if (!Number.isFinite(n) || n <= 0) {
+      setError('유효한 팁 금액을 입력하세요.')
+      return
+    }
+    addTip(Math.round(n))
+  }
+
   /** 미수: 토글(없으면 추가 / 있으면 첫 MISU 제거) — 왔다갔다 입력 가능 */
   const toggleMisuSplit = () => {
     setError(null)
@@ -929,7 +940,7 @@ export default function AdminStaffDetailPage() {
     staff?.affiliation === 'AONE' || staff?.affiliation === 'GOGO' ? AFFILIATION_LABEL[staff.affiliation] : ''
   const statusText = statusLabel((staff?.work_status as string) ?? attStatus)
 
-  const tipUnit = calc.tipTotal > 0 ? Math.round(calc.tipTotal / 1000) : 0
+  const summaryLine = (calc.line || '-').replace(/\s*\n\s*/g, ' ').trim()
 
   return (
     <div className="space-y-6">
@@ -953,14 +964,15 @@ export default function AdminStaffDetailPage() {
       )}
 
       <GlassCard className="p-5">
-        <div className="flex flex-row flex-wrap items-end gap-3">
-          <div className="min-w-0 w-[min(100%,9.5rem)] shrink-0">
-            <label className="text-sm font-medium text-white/80">가게 선택</label>
-            <div className="relative mt-2">
+        <div className="overflow-x-auto [scrollbar-width:none]">
+          <div className="flex min-w-[30rem] flex-nowrap items-end gap-2.5">
+          <div className="w-[9.25rem] shrink-0">
+            <label className="text-[11px] font-medium text-white/80">가게 선택</label>
+            <div className="relative mt-1.5">
               <input
                 disabled={storesLoading}
                 className={cn(
-                  'w-full rounded-xl border border-white/12 bg-black/20 px-2.5 py-2.5 text-sm text-white outline-none placeholder:text-white/30 focus:border-white/25 truncate',
+                  'w-full rounded-lg border border-white/12 bg-black/20 px-2.5 py-2 text-[12px] text-white outline-none placeholder:text-white/30 focus:border-white/25 truncate',
                   storesLoading && 'opacity-70 cursor-not-allowed'
                 )}
                 value={storeQuery}
@@ -979,35 +991,34 @@ export default function AdminStaffDetailPage() {
                 autoComplete="off"
               />
               {!storesLoading && storeDropdownOpen && filteredStores.length > 0 && (
-                <div className={cn('absolute z-20 mt-2 w-full overflow-hidden rounded-2xl', 'border border-white/12 bg-zinc-950/95 backdrop-blur-xl shadow-2xl')}>
+                <div className={cn('absolute z-20 mt-2 w-full overflow-hidden rounded-xl', 'border border-white/12 bg-zinc-950/95 backdrop-blur-xl shadow-2xl')}>
                   <div className="max-h-60 overflow-y-auto py-1">
                     {filteredStores.map((s) => (
                       <button
                         key={s.id}
                         onMouseDown={(e) => e.preventDefault()}
                         onClick={() => onPickStore(s)}
-                        className="w-full text-left px-4 py-3 hover:bg-white/10 transition"
+                        className="w-full text-left px-3 py-2.5 hover:bg-white/10 transition"
                         type="button"
                       >
-                        <div className="text-sm font-semibold text-white">{s.name}</div>
-                        <div className="mt-0.5 text-xs text-white/35">ID: {s.id}</div>
+                        <div className="text-[12px] font-semibold text-white">{s.name}</div>
                       </button>
                     ))}
                   </div>
                 </div>
               )}
             </div>
-            {storesLoading && <div className="mt-2 text-xs text-white/45">가게 목록을 불러오는 중입니다…</div>}
+            {storesLoading && <div className="mt-1.5 text-[10px] text-white/45">가게 목록 로드 중…</div>}
           </div>
 
-          <div className="flex-1 min-w-[10.5rem]">
-            <label className="text-sm font-medium text-white/80">시작 시각</label>
-            <div className="mt-2 flex max-w-full items-center gap-2">
+          <div className="min-w-0 flex-1">
+            <label className="text-[11px] font-medium text-white/80">시작 시각</label>
+            <div className="mt-1.5 flex flex-nowrap items-center gap-1.5">
               <input
                 type="time"
                 className={cn(
-                  'w-full min-w-[10.5rem] max-w-full flex-1 rounded-xl border border-white/12 bg-black/20 px-3 py-2.5',
-                  'text-white outline-none focus:border-white/25',
+                  'w-[7.1rem] min-w-0 shrink-0 rounded-lg border border-white/12 bg-black/20 px-2 py-2',
+                  'text-[12px] text-white outline-none focus:border-white/25',
                   '[color-scheme:dark]'
                 )}
                 value={workTime}
@@ -1016,7 +1027,7 @@ export default function AdminStaffDetailPage() {
               <button
                 type="button"
                 onClick={bumpStartTimePlus5}
-                className={cn('shrink-0 self-stretch', BTN_TEXT_SM)}
+                className="h-[34px] w-[40px] shrink-0 rounded-lg border border-white/12 bg-white/5 px-0 py-0 text-[11px] font-semibold text-white/80 hover:bg-white/10 transition"
                 title="현재 시각 +5분"
               >
                 +5
@@ -1024,54 +1035,38 @@ export default function AdminStaffDetailPage() {
             </div>
           </div>
         </div>
+        </div>
 
         {/* ✅ 3x5 버튼 (쌓기) */}
         <div className="mt-4">
           <div className="grid grid-cols-3 gap-2">
-            <CountButton label="반개" count={badgeCounts.J_HALF} onInc={() => incJ('J_HALF')} onDec={() => decJ('J_HALF')} />
-            <CountButton label="룸반개" count={badgeCounts.RT_HALF} onInc={() => incR('RT_HALF')} onDec={() => decR('RT_HALF')} />
-            <GridButton onClick={() => addTip(10000)}>팁 +10,000</GridButton>
-
-            <CountButton label="1개" count={badgeCounts.J_ONE} onInc={() => incJ('J_ONE')} onDec={() => decJ('J_ONE')} />
-            <CountButton label="룸1개" count={badgeCounts.RT_ONE} onInc={() => incR('RT_ONE')} onDec={() => decR('RT_ONE')} />
-            <GridButton onClick={() => addTip(50000)}>팁 +50,000</GridButton>
+            <CountButton label="2개" count={badgeCounts.J_TWO} onInc={() => incJ('J_TWO')} onDec={() => decJ('J_TWO')} />
+            <CountButton label="♡" count={badgeCounts.HEART} onInc={incHeart} onDec={decHeart} />
+            <GridButton onClick={() => addTip(100000)}>100,000</GridButton>
 
             <CountButton label="1개반" count={badgeCounts.J_ONE_HALF} onInc={() => incJ('J_ONE_HALF')} onDec={() => decJ('J_ONE_HALF')} />
-            <CountButton label="♡" count={badgeCounts.HEART} onInc={incHeart} onDec={decHeart} />
-            <GridButton onClick={() => addTip(100000)}>팁 +100,000</GridButton>
-
-            <CountButton label="2개" count={badgeCounts.J_TWO} onInc={() => incJ('J_TWO')} onDec={() => decJ('J_TWO')} />
             <CountButton label="@" count={badgeCounts.AT} onInc={incAt} onDec={decAt} />
+            <GridButton onClick={() => addTip(50000)}>50,000</GridButton>
+
+            <CountButton label="1개" count={badgeCounts.J_ONE} onInc={() => incJ('J_ONE')} onDec={() => decJ('J_ONE')} />
+            <GridButton onClick={addTipFromPrompt}>팁 직접입력</GridButton>
+            <GridButton onClick={() => addTip(10000)}>10,000</GridButton>
+
+            <CountButton label="룸1개" count={badgeCounts.RT_ONE} onInc={() => incR('RT_ONE')} onDec={() => decR('RT_ONE')} />
+            <CountButton label="룸반개" count={badgeCounts.RT_HALF} onInc={() => incR('RT_HALF')} onDec={() => decR('RT_HALF')} />
             <GridButton onClick={() => setTokens((p) => p.filter((x) => x.t !== 'TIP'))}>팁초기화</GridButton>
 
-            <GridButton active={tokens.some((t) => t.t === 'CASH')} onClick={toggleCashToken}>
-              현금
-            </GridButton>
-
-            <GridButton active={tokens.some((t) => t.t === 'MISU')} onClick={toggleMisuSplit}>
-              미수({MISU_MARK})
-            </GridButton>
-
+            <GridButton active={tokens.some((t) => t.t === 'CASH')} onClick={toggleCashToken}>현금</GridButton>
+            <GridButton active={tokens.some((t) => t.t === 'MISU')} onClick={toggleMisuSplit}>미수</GridButton>
             <GridButton onClick={resetAll}>전체초기화</GridButton>
           </div>
         </div>
 
         {/* ✅ 정산요약 */}
-        <div className="mt-4 rounded-2xl border border-white/10 bg-white/5 p-4">
-          <div className="text-sm text-white/50">정산 요약</div>
-
-          <div className="mt-1 text-white font-semibold whitespace-pre-line break-words" title={calc.line}>
-            {calc.line || '-'}
-          </div>
-
-          <div className="mt-2 text-white font-semibold whitespace-nowrap">
-            직원 {formatCurrency(calc.staffPay)}원, 관리자 {formatCurrency(calc.adminPay)}원
-          </div>
-
-          <div className="mt-2 text-xs text-white/55 space-y-1">
-            <div>팁: {tipUnit > 0 ? `${tipUnit} (천원단위)` : '0'}</div>
-            <div>미수: {calc.misuAmount > 0 ? `${formatCurrency(calc.misuAmount)}원` : '0'}</div>
-            <div>총액: {formatCurrency(calc.storeTotal)}원</div>
+        <div className="mt-4 rounded-xl border border-white/10 bg-white/5 px-3 py-2">
+          <div className="text-[11px] text-white/45">정산요약</div>
+          <div className="mt-1 text-[12px] font-semibold text-white/90 truncate" title={summaryLine}>
+            {summaryLine}
           </div>
         </div>
 
