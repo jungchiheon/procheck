@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabaseClient } from '@/lib/supabaseClient'
 import { ShieldCheck, User2, KeyRound } from 'lucide-react'
@@ -12,6 +12,31 @@ export default function LoginPage() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  const [bootChecking, setBootChecking] = useState(true)
+
+  useEffect(() => {
+    let alive = true
+    ;(async () => {
+      try {
+        const { data } = await supabaseClient.auth.getUser()
+        const u = data.user
+        if (!u) return
+        const { data: profile } = await supabaseClient
+          .from('user_profiles')
+          .select('role, is_active')
+          .eq('id', u.id)
+          .maybeSingle()
+        if (!alive || !profile?.is_active) return
+        if (profile.role === 'admin') router.replace('/admin')
+        else router.replace('/staff')
+      } finally {
+        if (alive) setBootChecking(false)
+      }
+    })()
+    return () => {
+      alive = false
+    }
+  }, [router])
 
   // 버튼 텍스트
   const buttonText = useMemo(() => (loading ? '로그인 중...' : '로그인'), [loading])
@@ -76,6 +101,8 @@ export default function LoginPage() {
       setLoading(false)
     }
   }
+
+  if (bootChecking) return null
 
   return (
     <div className="min-h-screen relative overflow-hidden">
