@@ -506,30 +506,21 @@ export default function AdminStaffDetailPage() {
 
   // 가게 검색
   const filteredStores = useMemo(() => {
-    const q = storeQuery.trim()
+    const rawQ = storeQuery.trim()
+    const q = normalizeSearchText(rawQ)
     const active = stores.filter((s) => s.is_active)
     if (!q) return active
-
-    if (isChosungString(q)) {
-      const qSeq = q
-      return active
-        .filter((s) => getChosungSeq(s.name).includes(qSeq))
-        .sort((a, b) => {
-          const aSeq = getChosungSeq(a.name)
-          const bSeq = getChosungSeq(b.name)
-          const aStarts = aSeq.startsWith(qSeq) ? 0 : 1
-          const bStarts = bSeq.startsWith(qSeq) ? 0 : 1
-          if (aStarts !== bStarts) return aStarts - bStarts
-          return a.name.localeCompare(b.name, 'ko')
-        })
-    }
-
-    const qLower = q.toLowerCase()
+    const qSeq = toChosungKey(rawQ)
     return active
-      .filter((s) => s.name.toLowerCase().includes(qLower))
+      .filter((s) => {
+        const nameText = normalizeSearchText(s.name)
+        if (nameText.includes(q)) return true
+        if (!qSeq) return false
+        return toChosungKey(s.name).includes(qSeq)
+      })
       .sort((a, b) => {
-        const aStarts = a.name.toLowerCase().startsWith(qLower) ? 0 : 1
-        const bStarts = b.name.toLowerCase().startsWith(qLower) ? 0 : 1
+        const aStarts = normalizeSearchText(a.name).startsWith(q) || (!!qSeq && toChosungKey(a.name).startsWith(qSeq)) ? 0 : 1
+        const bStarts = normalizeSearchText(b.name).startsWith(q) || (!!qSeq && toChosungKey(b.name).startsWith(qSeq)) ? 0 : 1
         if (aStarts !== bStarts) return aStarts - bStarts
         return a.name.localeCompare(b.name, 'ko')
       })
@@ -964,7 +955,7 @@ export default function AdminStaffDetailPage() {
       )}
 
       <GlassCard className="p-5">
-        <div className="overflow-x-auto [scrollbar-width:none]">
+        <div className="overflow-visible">
           <div className="flex min-w-[30rem] flex-nowrap items-end gap-2.5">
           <div className="w-[9.25rem] shrink-0">
             <label className="text-[11px] font-medium text-white/80">가게 선택</label>
@@ -990,20 +981,24 @@ export default function AdminStaffDetailPage() {
                 placeholder={storesLoading ? '불러오는 중…' : ''}
                 autoComplete="off"
               />
-              {!storesLoading && storeDropdownOpen && filteredStores.length > 0 && (
+              {!storesLoading && storeDropdownOpen && (
                 <div className={cn('absolute z-20 mt-2 w-full overflow-hidden rounded-xl', 'border border-white/12 bg-zinc-950/95 backdrop-blur-xl shadow-2xl')}>
                   <div className="max-h-60 overflow-y-auto py-1">
-                    {filteredStores.map((s) => (
-                      <button
-                        key={s.id}
-                        onMouseDown={(e) => e.preventDefault()}
-                        onClick={() => onPickStore(s)}
-                        className="w-full text-left px-3 py-2.5 hover:bg-white/10 transition"
-                        type="button"
-                      >
-                        <div className="text-[12px] font-semibold text-white">{s.name}</div>
-                      </button>
-                    ))}
+                    {filteredStores.length === 0 ? (
+                      <div className="px-3 py-2.5 text-[11px] text-white/45">검색 결과 없음</div>
+                    ) : (
+                      filteredStores.map((s) => (
+                        <button
+                          key={s.id}
+                          onMouseDown={(e) => e.preventDefault()}
+                          onClick={() => onPickStore(s)}
+                          className="w-full text-left px-3 py-2.5 hover:bg-white/10 transition"
+                          type="button"
+                        >
+                          <div className="text-[12px] font-semibold text-white">{s.name}</div>
+                        </button>
+                      ))
+                    )}
                   </div>
                 </div>
               )}
@@ -1682,20 +1677,43 @@ function ssWrite(key: string, value: any) {
 
 /* ------------------------- 초성검색 ------------------------- */
 const CHOSUNG = ['ㄱ', 'ㄲ', 'ㄴ', 'ㄷ', 'ㄸ', 'ㄹ', 'ㅁ', 'ㅂ', 'ㅃ', 'ㅅ', 'ㅆ', 'ㅇ', 'ㅈ', 'ㅉ', 'ㅊ', 'ㅋ', 'ㅌ', 'ㅍ', 'ㅎ'] as const
+const LEADING_JAMO = ['ᄀ', 'ᄁ', 'ᄂ', 'ᄃ', 'ᄄ', 'ᄅ', 'ᄆ', 'ᄇ', 'ᄈ', 'ᄉ', 'ᄊ', 'ᄋ', 'ᄌ', 'ᄍ', 'ᄎ', 'ᄏ', 'ᄐ', 'ᄑ', 'ᄒ'] as const
+
+function normalizeChosungChar(ch: string) {
+  const idx = (LEADING_JAMO as readonly string[]).indexOf(ch)
+  if (idx >= 0) return (CHOSUNG as readonly string[])[idx] ?? ch
+  return ch
+}
+
+function normalizeSearchText(v: string) {
+  return v.replace(/\s+/g, '').toLowerCase()
+}
+
+function toChosungKey(q: string) {
+  let out = ''
+  for (const rawCh of q) {
+    const normalized = normalizeChosungChar(rawCh)
+    if ((CHOSUNG as readonly string[]).includes(normalized)) {
+      out += normalized
+      continue
+    }
+    const fromSyllable = getChosung(rawCh)
+    if (fromSyllable) out += fromSyllable
+  }
+  return out
+}
 
 function isChosungString(q: string) {
   if (!q) return false
-  for (const ch of q) if (!(CHOSUNG as readonly string[]).includes(ch)) return false
+  for (const rawCh of q) {
+    const ch = normalizeChosungChar(rawCh)
+    if (!(CHOSUNG as readonly string[]).includes(ch)) return false
+  }
   return true
 }
 
 function getChosungSeq(name: string) {
-  let out = ''
-  for (const ch of name) {
-    const c = getChosung(ch)
-    if (c) out += c
-  }
-  return out
+  return toChosungKey(name)
 }
 
 function getChosung(ch: string) {

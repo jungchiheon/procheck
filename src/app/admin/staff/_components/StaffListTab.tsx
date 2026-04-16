@@ -70,23 +70,23 @@ export function StaffListTab(props: StaffListTabProps) {
   }, [rowsAll])
 
   const filteredStores = useMemo(() => {
-    const q = storeQuery.trim().toLowerCase()
+    const rawQ = storeQuery.trim()
+    const q = normalizeSearchText(rawQ)
     const active = stores.filter((s) => s.is_active)
     if (!q) return active
-    const qChosung = getChosungSeq(storeQuery.trim())
-    const qIsChosung = isChosungString(storeQuery.trim())
+    const qChosung = toChosungKey(rawQ)
     return active
       .filter((s) => {
         const name = s.name || ''
-        const nameLower = name.toLowerCase()
-        if (nameLower.includes(q)) return true
-        if (!qIsChosung) return false
-        const nameChosung = getChosungSeq(name)
+        const nameText = normalizeSearchText(name)
+        if (nameText.includes(q)) return true
+        if (!qChosung) return false
+        const nameChosung = toChosungKey(name)
         return nameChosung.includes(qChosung)
       })
       .sort((a, b) => {
-        const aStarts = a.name.toLowerCase().startsWith(q) ? 0 : 1
-        const bStarts = b.name.toLowerCase().startsWith(q) ? 0 : 1
+        const aStarts = normalizeSearchText(a.name).startsWith(q) || (!!qChosung && toChosungKey(a.name).startsWith(qChosung)) ? 0 : 1
+        const bStarts = normalizeSearchText(b.name).startsWith(q) || (!!qChosung && toChosungKey(b.name).startsWith(qChosung)) ? 0 : 1
         if (aStarts !== bStarts) return aStarts - bStarts
         return a.name.localeCompare(b.name, 'ko')
       })
@@ -225,7 +225,7 @@ export function StaffListTab(props: StaffListTabProps) {
         </button>
       </div>
 
-      <div className="mt-3 overflow-x-auto rounded-lg border border-white/10 bg-black/15 p-2.5 [scrollbar-width:none]">
+      <div className="mt-3 overflow-visible rounded-lg border border-white/10 bg-black/15 p-2.5">
         <div className="flex min-w-[29rem] flex-nowrap items-end gap-2.5">
         <div className="w-[8.75rem] shrink-0">
           <label className="text-[11px] font-medium text-white/75">가게 선택</label>
@@ -247,20 +247,24 @@ export function StaffListTab(props: StaffListTabProps) {
               placeholder={storesLoading ? '불러오는 중…' : ''}
               autoComplete="off"
             />
-            {!storesLoading && storeDropdownOpen && filteredStores.length > 0 && (
+            {!storesLoading && storeDropdownOpen && (
               <div className={cn('absolute z-20 mt-2 w-full overflow-hidden rounded-xl', 'border border-white/12 bg-zinc-950/95 backdrop-blur-xl shadow-2xl')}>
                 <div className="max-h-52 overflow-y-auto py-1">
-                  {filteredStores.map((s) => (
-                    <button
-                      key={s.id}
-                      onMouseDown={(e) => e.preventDefault()}
-                      onClick={() => onPickStore(s)}
-                      className="w-full text-left px-3 py-2.5 hover:bg-white/10 transition"
-                      type="button"
-                    >
-                      <div className="text-[12px] font-semibold text-white">{s.name}</div>
-                    </button>
-                  ))}
+                  {filteredStores.length === 0 ? (
+                    <div className="px-3 py-2.5 text-[11px] text-white/45">검색 결과 없음</div>
+                  ) : (
+                    filteredStores.map((s) => (
+                      <button
+                        key={s.id}
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => onPickStore(s)}
+                        className="w-full text-left px-3 py-2.5 hover:bg-white/10 transition"
+                        type="button"
+                      >
+                        <div className="text-[12px] font-semibold text-white">{s.name}</div>
+                      </button>
+                    ))
+                  )}
                 </div>
               </div>
             )}
@@ -360,20 +364,49 @@ function addMinutesToNowHHMM(addMin: number) {
 }
 
 const CHOSUNG = ['ㄱ', 'ㄲ', 'ㄴ', 'ㄷ', 'ㄸ', 'ㄹ', 'ㅁ', 'ㅂ', 'ㅃ', 'ㅅ', 'ㅆ', 'ㅇ', 'ㅈ', 'ㅉ', 'ㅊ', 'ㅋ', 'ㅌ', 'ㅍ', 'ㅎ'] as const
+const LEADING_JAMO = ['ᄀ', 'ᄁ', 'ᄂ', 'ᄃ', 'ᄄ', 'ᄅ', 'ᄆ', 'ᄇ', 'ᄈ', 'ᄉ', 'ᄊ', 'ᄋ', 'ᄌ', 'ᄍ', 'ᄎ', 'ᄏ', 'ᄐ', 'ᄑ', 'ᄒ'] as const
+
+function normalizeChosungChar(ch: string) {
+  const idx = (LEADING_JAMO as readonly string[]).indexOf(ch)
+  if (idx >= 0) return (CHOSUNG as readonly string[])[idx] ?? ch
+  return ch
+}
+
+function normalizeChosungQuery(q: string) {
+  let out = ''
+  for (const ch of q) out += normalizeChosungChar(ch)
+  return out
+}
+
+function normalizeSearchText(v: string) {
+  return v.replace(/\s+/g, '').toLowerCase()
+}
+
+function toChosungKey(q: string) {
+  let out = ''
+  for (const rawCh of q) {
+    const normalized = normalizeChosungChar(rawCh)
+    if ((CHOSUNG as readonly string[]).includes(normalized)) {
+      out += normalized
+      continue
+    }
+    const fromSyllable = getChosung(rawCh)
+    if (fromSyllable) out += fromSyllable
+  }
+  return out
+}
 
 function isChosungString(q: string) {
   if (!q) return false
-  for (const ch of q) if (!(CHOSUNG as readonly string[]).includes(ch)) return false
+  for (const rawCh of q) {
+    const ch = normalizeChosungChar(rawCh)
+    if (!(CHOSUNG as readonly string[]).includes(ch)) return false
+  }
   return true
 }
 
 function getChosungSeq(name: string) {
-  let out = ''
-  for (const ch of name) {
-    const c = getChosung(ch)
-    if (c) out += c
-  }
-  return out
+  return toChosungKey(name)
 }
 
 function getChosung(ch: string) {
