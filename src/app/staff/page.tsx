@@ -8,7 +8,8 @@ import { GlassCard } from '@/components/ui/GlassCard'
 import { PageHeader } from '@/components/ui/PageHeader'
 import { ProButton } from '@/components/ui/ProButton'
 import { cn } from '@/lib/cn'
-import { BadgeCheck, PhoneCall, MessageCircle, PackageSearch } from 'lucide-react'
+import { BadgeCheck, PhoneCall, Megaphone, ChevronRight } from 'lucide-react'
+import { StaffCallBell } from '@/components/StaffCallBell'
 
 type Profile = {
   id: string
@@ -18,13 +19,10 @@ type Profile = {
   last_checkout_at: string | null
 }
 
-type UnreadRow = { room_id: number; unread_count: number }
-
 export default function StaffHomePage() {
   const router = useRouter()
   const [profile, setProfile] = useState<Profile | null>(null)
   const [loadingAction, setLoadingAction] = useState(false)
-  const [chatUnread, setChatUnread] = useState(0)
 
   useEffect(() => {
     ;(async () => {
@@ -46,16 +44,6 @@ export default function StaffHomePage() {
       }
 
       setProfile(p as Profile)
-
-      // 채팅 unread total
-      const uid = data.user.id
-      const { data: uc } = await supabaseClient
-        .rpc('get_chat_unread_counts', { p_uid: uid })
-        .returns<UnreadRow[]>()
-
-      const rows = (uc ?? []) as UnreadRow[]
-      const total = rows.reduce((sum, r) => sum + (Number(r.unread_count) || 0), 0)
-      setChatUnread(total)
     })()
   }, [router])
 
@@ -103,7 +91,7 @@ export default function StaffHomePage() {
       })
 
       if (!res.ok) return alert('호출 실패')
-      alert('호출 전송됨')
+      alert('전송됨')
     } finally {
       setLoadingAction(false)
     }
@@ -122,27 +110,27 @@ export default function StaffHomePage() {
         title={profile.nickname}
         subtitle={`현재 상태: ${isWorking ? '출근 중' : '퇴근/대기'}`}
         right={
-          <ProButton variant="ghost" onClick={onLogout}>
-            로그아웃
-          </ProButton>
+          <div className="flex items-center gap-2">
+            <StaffCallBell />
+            <ProButton variant="ghost" onClick={onLogout}>
+              로그아웃
+            </ProButton>
+          </div>
         }
       />
 
-      {/* 근무 상태 */}
       <GlassCard className="p-6">
         <div className="flex items-center gap-3">
-          <div className="h-10 w-10 rounded-xl border border-white/10 bg-black/20 flex items-center justify-center">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-black/20">
             <BadgeCheck className="h-5 w-5 text-white/80" />
           </div>
           <div>
-            <div className="text-white font-semibold tracking-tight">근무 상태</div>
-            <div className="text-sm text-white/55">
-              {isWorking ? '출근 중입니다.' : '현재 근무 중이 아닙니다.'}
-            </div>
+            <div className="font-semibold tracking-tight text-white">근무 상태</div>
+            <div className="text-sm text-white/55">{isWorking ? '출근 중입니다.' : '현재 근무 중이 아닙니다.'}</div>
           </div>
         </div>
 
-        <div className="mt-5 grid gap-3 sm:grid-cols-3">
+        <div className="mt-5 grid gap-3 sm:grid-cols-2">
           <ProButton disabled={loadingAction || isWorking} onClick={onCheckIn}>
             출근하기
           </ProButton>
@@ -150,54 +138,41 @@ export default function StaffHomePage() {
           <ProButton disabled={loadingAction || !isWorking} onClick={onCheckOut} variant="ghost">
             퇴근하기
           </ProButton>
+        </div>
 
-          <ProButton disabled={loadingAction} onClick={onCallAdmin} variant="ghost">
+        <div className="mt-6 flex flex-col gap-3 rounded-xl border border-white/10 bg-black/20 p-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/5">
+              <PhoneCall className="h-5 w-5 text-sky-200/90" />
+            </div>
+            <div className="font-semibold text-white">관리자 호출</div>
+          </div>
+          <ProButton disabled={loadingAction} onClick={onCallAdmin} className="w-full shrink-0 sm:w-auto">
             <PhoneCall className="mr-2 h-4 w-4" />
-            관리자 호출
+            호출
           </ProButton>
         </div>
       </GlassCard>
 
-      {/* 요청: 근무상태 밑에 "한줄 2칸" (분실물 / 채팅) */}
-      <GlassCard className="p-6">
-        <div className="grid gap-3 sm:grid-cols-2">
-          <button
-            onClick={() => router.push('/staff/lost')}
-            className="relative rounded-2xl border border-white/10 bg-white/5 p-5 text-left hover:bg-white/10 transition"
-            type="button"
-          >
-            <RowIcon2 icon={<PackageSearch className="h-5 w-5 text-white/80" />} title="분실물 게시판" desc="" />
-          </button>
-
-          <button
-            onClick={() => router.push('/staff/chat')}
-            className="relative rounded-2xl border border-white/10 bg-white/5 p-5 text-left hover:bg-white/10 transition"
-            type="button"
-          >
-            <RowIcon2 icon={<MessageCircle className="h-5 w-5 text-white/80" />} title="채팅" desc="" />
-
-            {chatUnread > 0 && (
-              <div className="absolute top-4 right-4 min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[11px] flex items-center justify-center">
-                {chatUnread > 99 ? '99+' : chatUnread}
-              </div>
-            )}
-          </button>
+      <button
+        type="button"
+        onClick={() => router.push('/staff/announcements')}
+        className={cn(
+          'flex w-full items-center justify-between gap-3 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2.5 text-left',
+          'transition hover:bg-white/[0.07]'
+        )}
+      >
+        <div className="flex min-w-0 items-center gap-2.5">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-black/25">
+            <Megaphone className="h-4 w-4 text-white/55" />
+          </div>
+          <div className="min-w-0">
+            <div className="text-[13px] font-medium text-white/90">공지사항</div>
+            <div className="text-[11px] text-white/40">읽기 전용</div>
+          </div>
         </div>
-      </GlassCard>
-    </div>
-  )
-}
-
-function RowIcon2({ icon, title, desc }: { icon: React.ReactNode; title: string; desc: string }) {
-  return (
-    <div className="flex items-center gap-3">
-      <div className={cn('h-10 w-10 rounded-xl border border-white/10 bg-black/20 flex items-center justify-center')}>
-        {icon}
-      </div>
-      <div>
-        <div className="text-white font-semibold tracking-tight">{title}</div>
-        <div className="text-sm text-white/55">{desc}</div>
-      </div>
+        <ChevronRight className="h-4 w-4 shrink-0 text-white/30" />
+      </button>
     </div>
   )
 }

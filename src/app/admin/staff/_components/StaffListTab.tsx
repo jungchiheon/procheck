@@ -58,13 +58,13 @@ export function StaffListTab(props: StaffListTabProps) {
       { key: 'CHOICE_ING', label: '초이스중', rows: [], tone: 'text-sky-200/90' },
       { key: 'CAR_WAIT', label: '차대기중', rows: [], tone: 'text-amber-200/90' },
       { key: 'CHOICE_DONE', label: '초이스완료', rows: [], tone: 'text-emerald-200/90' },
-      { key: 'ETC', label: '기타/퇴근', rows: [], tone: 'text-white/65' },
+      { key: 'ON', label: '출근', rows: [], tone: 'text-white/65' },
     ]
     for (const r of rowsAll) {
       if (r.work_status === 'CHOICE_ING') sections[0].rows.push(r)
       else if (r.work_status === 'CAR_WAIT') sections[1].rows.push(r)
       else if (r.work_status === 'CHOICE_DONE') sections[2].rows.push(r)
-      else sections[3].rows.push(r)
+      else if (r.work_status && r.work_status !== 'OFF') sections[3].rows.push(r)
     }
     return sections
   }, [rowsAll])
@@ -134,14 +134,6 @@ export function StaffListTab(props: StaffListTabProps) {
     refreshPrefillMap()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible])
-
-  const statusText = (s: StaffStatus | null) => {
-    if (!s || s === 'OFF') return '퇴근'
-    if (s === 'CHOICE_ING') return '초이스중'
-    if (s === 'CHOICE_DONE') return '초이스완료'
-    if (s === 'CAR_WAIT') return '차대기'
-    return '출근'
-  }
 
   const toggleSelectOrOpen = (staffId: string) => {
     const now = Date.now()
@@ -307,10 +299,9 @@ export function StaffListTab(props: StaffListTabProps) {
                 <div className={cn('px-1 pb-1 text-[10px] font-semibold', section.tone)}>
                   {section.label} <span className="text-white/35">({section.rows.length})</span>
                 </div>
-                <div className="grid grid-cols-3 gap-1.5 sm:grid-cols-4">
+                <div className="grid grid-cols-4 gap-1.5">
                   {section.rows.map((s) => {
                     const selected = selectedIds.includes(s.id)
-                    const isOn = s.work_status != null && s.work_status !== 'OFF'
                     const pre = prefillMap[s.id]
                     return (
                       <button
@@ -325,9 +316,6 @@ export function StaffListTab(props: StaffListTabProps) {
                         disabled={isPending}
                       >
                         <div className="truncate text-[11px] font-semibold text-white">{s.nickname}</div>
-                        <div className={cn('mt-0.5 text-[10px] font-medium', isOn ? 'text-emerald-200/90' : 'text-rose-200/90')}>
-                          {statusText(s.work_status)}
-                        </div>
                         <div className="mt-0.5 truncate text-[10px] text-white/50">{pre?.storeName || '-'}</div>
                       </button>
                     )

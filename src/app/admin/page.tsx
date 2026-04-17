@@ -9,7 +9,7 @@ import { PageHeader } from '@/components/ui/PageHeader'
 import { ProButton } from '@/components/ui/ProButton'
 import { AdminNotificationBell } from '@/components/AdminNotificationBell'
 import { cn } from '@/lib/cn'
-import { Users, Store, UserPlus, UserCheck, X } from 'lucide-react'
+import { Users, Store, UserPlus, UserCheck, X, Megaphone } from 'lucide-react'
 
 type Aff = 'AONE' | 'GOGO'
 type StaffStatus = 'WORKING' | 'CAR_WAIT' | 'LODGE_WAIT' | 'OFF' | 'CHOICE_ING' | 'CHOICE_DONE'
@@ -194,7 +194,20 @@ export default function AdminHomePage() {
               <span className="text-sm font-semibold text-white">가게 관리</span>
             </button>
 
-            <div className="rounded-2xl border border-dashed border-white/10 bg-white/[0.03] aspect-square" />
+            <button
+              onClick={() => router.push('/admin/announcements')}
+              className={cn(
+                'group flex min-h-0 flex-col items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/5 p-3',
+                'text-center hover:bg-white/10 transition',
+                'aspect-square'
+              )}
+              type="button"
+            >
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-black/25">
+                <Megaphone className="h-5 w-5 text-white/85" />
+              </div>
+              <span className="text-sm font-semibold text-white">공지사항</span>
+            </button>
             <button
               onClick={() => void openAttendance()}
               className={cn(
