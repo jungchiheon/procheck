@@ -291,6 +291,8 @@ export function buildMisuOnlyText(args: { memoObj: any; misuAmount: number }) {
 // ✅ 정산 탭 개별 라인(서비스/룸 합산 + addon + (tip) + □□) : “쌓는 방식” 반영
 export function buildSettleLineFromMemo(memoObj: any) {
   if (!memoObj || typeof memoObj !== 'object') return '-'
+  const manualLine = String(memoObj?.manualSettleLine ?? '').trim()
+  if (manualLine) return manualLine
 
   // v5 tokens 우선
   if (memoObj.v === 5 && Array.isArray(memoObj.tokens)) {
@@ -451,6 +453,8 @@ export function deriveSettleLog(r: any, staffMap: Map<string, string>): SettleLo
         : '가게 미지정'
 
   const payRaw = Array.isArray(r?.staff_payment_logs) ? r.staff_payment_logs[0] : null
+  const paymentIdRaw = Number(payRaw?.id ?? 0)
+  const paymentId = Number.isFinite(paymentIdRaw) && paymentIdRaw > 0 ? paymentIdRaw : null
   const memoStr: string | null = payRaw?.memo ?? null
   const memoObj = safeJson(memoStr)
 
@@ -480,6 +484,7 @@ export function deriveSettleLog(r: any, staffMap: Map<string, string>): SettleLo
 
   return {
     id,
+    paymentId,
     staffId,
     staffName,
     work_at,

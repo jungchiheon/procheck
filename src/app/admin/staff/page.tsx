@@ -8,7 +8,7 @@ import { GlassCard } from '@/components/ui/GlassCard'
 import { PageHeader } from '@/components/ui/PageHeader'
 import { cn } from '@/lib/cn'
 import { AdminNotificationBell } from '@/components/AdminNotificationBell'
-import { CheckCircle2, X, ChevronLeft, ChevronRight, Star, Circle, Trash2 } from 'lucide-react'
+import { CheckCircle2, X, ChevronLeft, ChevronRight, Star, Circle, Trash2, Pencil } from 'lucide-react'
 import { ProButton } from '@/components/ui/ProButton'
 import { StaffListTab } from './_components/StaffListTab'
 import { fetchStaffListForAdmin } from './staff-admin.fetch'
@@ -115,6 +115,21 @@ export default function AdminStaffPage() {
   } | null>(null)
   const [heartStaffId, setHeartStaffId] = useState<string | null>(null)
   const [heartStaffNickname, setHeartStaffNickname] = useState<string>('')
+  const [settleEditModal, setSettleEditModal] = useState<{
+    staffId: string
+    staffName: string
+    rows: Array<{
+      settleId: number
+      paymentId: number | null
+      storeName: string
+      timeKo: string
+      lineText: string
+      staffPay: number
+      adminPay: number
+      memoObj: any
+    }>
+  } | null>(null)
+  const [settleEditSaving, setSettleEditSaving] = useState(false)
   const [misuConfirmItem, setMisuConfirmItem] = useState<MisuItem | null>(null)
   const [misuConfirmLoading, setMisuConfirmLoading] = useState(false)
   const [heartDraft, setHeartDraft] = useState<{
@@ -696,7 +711,7 @@ export default function AdminStaffPage() {
     while (true) {
       const { data, error } = await supabaseClient
         .from('staff_work_logs')
-        .select('id, staff_id, work_at, minutes, stores(name), staff_payment_logs(amount, memo, method, paid_at)')
+        .select('id, staff_id, work_at, minutes, stores(name), staff_payment_logs(id, amount, memo, method, paid_at)')
         .gte('work_at', startIso)
         .lt('work_at', endIso)
         .order('work_at', { ascending: true })
@@ -810,9 +825,14 @@ export default function AdminStaffPage() {
         const seq = buildSettleLineFromMemo(x.memoObj) // ✅ 쌓는 방식 반영 + □□
         return {
           id: `${x.staffId}_${x.id}`,
+          settleId: x.id,
+          paymentId: x.paymentId,
           storeName: x.storeName,
           timeKo: formatTimeKoHm(x.work_at),
           seq,
+          staffPay: x.staffPay,
+          adminPay: x.adminPay,
+          memoObj: x.memoObj,
         }
       })
 
@@ -1007,6 +1027,58 @@ export default function AdminStaffPage() {
     setHeartStaffNickname('')
     setHeartDraft(null)
   }, [heartStaffId, heartDraft, flushHeartSave])
+
+  const openSettleEditModal = useCallback(
+    (block: (typeof settleStaffBlocks)[number]) => {
+      setSettleEditModal({
+        staffId: block.staffId,
+        staffName: block.staffName,
+        rows: block.lines.map((ln) => ({
+          settleId: ln.settleId,
+          paymentId: ln.paymentId,
+          storeName: ln.storeName,
+          timeKo: ln.timeKo,
+          lineText: ln.seq,
+          staffPay: Math.max(0, Number(ln.staffPay || 0)),
+          adminPay: Math.max(0, Number(ln.adminPay || 0)),
+          memoObj: ln.memoObj && typeof ln.memoObj === 'object' ? ln.memoObj : {},
+        })),
+      })
+    },
+    [settleStaffBlocks]
+  )
+
+  const saveSettleEditModal = useCallback(async () => {
+    if (!settleEditModal) return
+    setSettleEditSaving(true)
+    setSettleError(null)
+    try {
+      for (const row of settleEditModal.rows) {
+        if (!row.paymentId) continue
+        const memoObj = row.memoObj && typeof row.memoObj === 'object' ? { ...row.memoObj } : {}
+        memoObj.staffPay = Math.max(0, Number(row.staffPay || 0))
+        memoObj.adminPay = Math.max(0, Number(row.adminPay || 0))
+        const manualLine = row.lineText.trim()
+        if (manualLine) memoObj.manualSettleLine = manualLine
+        else delete memoObj.manualSettleLine
+
+        const { error } = await supabaseClient
+          .from('staff_payment_logs')
+          .update({
+            amount: Math.max(0, Number(row.staffPay || 0)),
+            memo: JSON.stringify(memoObj),
+          })
+          .eq('id', row.paymentId)
+        if (error) throw new Error(error.message)
+      }
+      setSettleEditModal(null)
+      await runSettlementDay(settleYmd, { silent: true })
+    } catch (e: any) {
+      setSettleError(e?.message ?? '근무 내역 수정 저장 실패')
+    } finally {
+      setSettleEditSaving(false)
+    }
+  }, [runSettlementDay, settleEditModal, settleYmd])
 
   useEffect(() => {
     const panel = searchParams.get('panel')
@@ -1549,6 +1621,15 @@ export default function AdminStaffPage() {
                         <div className="flex shrink-0 items-center gap-2">
                           <button
                             type="button"
+                            title="근무 내역 수정"
+                            onClick={() => openSettleEditModal(b)}
+                            className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-sky-400/35 bg-sky-500/12 text-sky-100 hover:bg-sky-500/22 active:scale-[0.97] transition"
+                            aria-label="근무 내역 수정"
+                          >
+                            <Pencil className="h-4 w-4" strokeWidth={2} />
+                          </button>
+                          <button
+                            type="button"
                             title={`처리상태: ${SETTLE_PROCESS_LABEL[proc]}`}
                             onClick={() => setSettleProcessPicker({ staffId: b.staffId, staffName: b.staffName, current: proc })}
                             className={cn(
@@ -1614,6 +1695,118 @@ export default function AdminStaffPage() {
                 )
               })}
           </div>
+
+          {settleEditModal && (
+            <div className="fixed inset-0 z-[65] flex items-center justify-center p-4">
+              <button
+                type="button"
+                className="absolute inset-0 bg-black/70 backdrop-blur-sm"
+                aria-label="닫기"
+                onClick={() => (settleEditSaving ? null : setSettleEditModal(null))}
+              />
+              <div className="relative w-full max-w-2xl rounded-2xl border border-white/15 bg-zinc-950 shadow-2xl">
+                <div className="border-b border-white/10 px-4 py-3">
+                  <div className="text-base font-bold text-white">{settleEditModal.staffName} 근무 내역 수정</div>
+                </div>
+                <div className="max-h-[65vh] space-y-2 overflow-y-auto px-4 py-3">
+                  {settleEditModal.rows.map((row, idx) => (
+                    <div key={`${row.settleId}_${idx}`} className="rounded-xl border border-white/12 bg-black/20 p-3">
+                      <div className="text-[11px] text-white/55">
+                        {row.storeName} · {row.timeKo}
+                      </div>
+                      <div className="mt-2 grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="text-[11px] text-white/70">정산금액</label>
+                          <input
+                            type="number"
+                            min={0}
+                            value={row.staffPay}
+                            onChange={(e) => {
+                              const n = Math.max(0, Number(e.target.value || 0))
+                              setSettleEditModal((prev) =>
+                                prev
+                                  ? {
+                                      ...prev,
+                                      rows: prev.rows.map((r, i) => (i === idx ? { ...r, staffPay: n } : r)),
+                                    }
+                                  : prev
+                              )
+                            }}
+                            className="mt-1 w-full rounded-lg border border-white/12 bg-zinc-900 px-2.5 py-2 text-[12px] text-white outline-none focus:border-white/25"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[11px] text-white/70">수익금액</label>
+                          <input
+                            type="number"
+                            min={0}
+                            value={row.adminPay}
+                            onChange={(e) => {
+                              const n = Math.max(0, Number(e.target.value || 0))
+                              setSettleEditModal((prev) =>
+                                prev
+                                  ? {
+                                      ...prev,
+                                      rows: prev.rows.map((r, i) => (i === idx ? { ...r, adminPay: n } : r)),
+                                    }
+                                  : prev
+                              )
+                            }}
+                            className="mt-1 w-full rounded-lg border border-white/12 bg-zinc-900 px-2.5 py-2 text-[12px] text-white outline-none focus:border-white/25"
+                          />
+                        </div>
+                      </div>
+                      <div className="mt-2">
+                        <label className="text-[11px] text-white/70">일했던내역</label>
+                        <textarea
+                          value={row.lineText}
+                          onChange={(e) => {
+                            const v = e.target.value
+                            setSettleEditModal((prev) =>
+                              prev
+                                ? {
+                                    ...prev,
+                                    rows: prev.rows.map((r, i) => (i === idx ? { ...r, lineText: v } : r)),
+                                  }
+                                : prev
+                            )
+                          }}
+                          className="mt-1 min-h-[64px] w-full rounded-lg border border-white/12 bg-zinc-900 px-2.5 py-2 text-[12px] text-white outline-none focus:border-white/25"
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div className="border-t border-white/10 px-4 py-3">
+                  <div className="mb-2 flex items-center justify-end gap-4 text-xs text-white/60">
+                    <span>
+                      정산 합계{' '}
+                      <b className="text-white/85">{formatMoneyDotThousands(settleEditModal.rows.reduce((s, r) => s + Math.max(0, Number(r.staffPay || 0)), 0))}</b>
+                    </span>
+                    <span>
+                      수익 합계{' '}
+                      <b className="text-emerald-200/95">
+                        {formatMoneyDotThousands(settleEditModal.rows.reduce((s, r) => s + Math.max(0, Number(r.adminPay || 0)), 0))}
+                      </b>
+                    </span>
+                  </div>
+                  <div className="flex justify-end gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setSettleEditModal(null)}
+                      disabled={settleEditSaving}
+                      className="rounded-lg border border-white/12 bg-white/5 px-3 py-1.5 text-xs text-white/80 hover:bg-white/10 disabled:opacity-50"
+                    >
+                      취소
+                    </button>
+                    <ProButton type="button" onClick={() => void saveSettleEditModal()} disabled={settleEditSaving} className="text-[12px]">
+                      {settleEditSaving ? '저장 중…' : '저장'}
+                    </ProButton>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* 별: 정산 계좌 (실시간 저장) */}
           {settleProcessPicker && (

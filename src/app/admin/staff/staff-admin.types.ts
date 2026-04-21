@@ -52,6 +52,7 @@ export type MisuItem = {
 // 전체 정산 raw row
 export type SettleLog = {
   id: number
+  paymentId: number | null
   staffId: string
   staffName: string
   work_at: string
