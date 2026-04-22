@@ -394,35 +394,17 @@ export function formatMoneyDotThousands(won: number) {
   return n.toLocaleString('ko-KR')
 }
 
-/**
- * 예시 헤더 한 줄:
- * `미지 568 입금` · `보영 1000 현금 / 234 입금` · `지원 312 정산`
- * (직원 급여 천원 단위, 현금/비현금 분리 시 `현금 / 입금`)
- */
 export function buildSettleStaffHeaderLine(opts: {
   staffName: string
-  cashUnits: number
-  nonCashUnits: number
-  staffUnit: number
-  proc: SettleProcessKey
+  settleUnit: number
+  gabulUnit: number
+  finalUnit: number
 }) {
-  const { staffName, cashUnits, nonCashUnits, staffUnit, proc } = opts
-  const cu = Math.max(0, Math.round(Number(cashUnits) || 0))
-  const nu = Math.max(0, Math.round(Number(nonCashUnits) || 0))
-  const su = Math.max(0, Math.round(Number(staffUnit) || 0))
-
-  if (cu > 0 && nu > 0) {
-    return `${staffName} ${cu} 현금 / ${nu} 입금`
-  }
-  if (cu > 0) {
-    return `${staffName} ${cu} 현금`
-  }
-  if (nu > 0) {
-    const tail = proc === 'PENDING' ? '정산' : '입금'
-    return `${staffName} ${nu} ${tail}`
-  }
-  const tail = proc === 'CASH_DONE' ? '현금' : proc === 'DEPOSIT_DONE' ? '입금' : '정산'
-  return `${staffName} ${su} ${tail}`
+  const { staffName, settleUnit, gabulUnit, finalUnit } = opts
+  const su = Math.max(0, Math.round(Number(settleUnit) || 0))
+  const gu = Math.max(0, Math.round(Number(gabulUnit) || 0))
+  const fu = Math.max(0, Math.round(Number(finalUnit) || 0))
+  return `${staffName} ${su} 정산 / 가불 -${gu} / ${fu}`
 }
 
 /* ---- settlement helpers ---- */
@@ -452,7 +434,8 @@ export function deriveSettleLog(r: any, staffMap: Map<string, string>): SettleLo
         ? String(r.stores[0].name)
         : '가게 미지정'
 
-  const payRaw = Array.isArray(r?.staff_payment_logs) ? r.staff_payment_logs[0] : null
+  const payJoin = r?.staff_payment_logs
+  const payRaw = Array.isArray(payJoin) ? payJoin[0] ?? null : payJoin ?? null
   const paymentIdRaw = Number(payRaw?.id ?? 0)
   const paymentId = Number.isFinite(paymentIdRaw) && paymentIdRaw > 0 ? paymentIdRaw : null
   const memoStr: string | null = payRaw?.memo ?? null
@@ -462,6 +445,7 @@ export function deriveSettleLog(r: any, staffMap: Map<string, string>): SettleLo
 
   let storeTotal = 0
   let staffPay = Math.max(0, Number(payRaw?.amount ?? 0))
+  let gabulAmount = 0
   let adminPay = 0
   let tip = 0
   let misu = false
@@ -473,6 +457,7 @@ export function deriveSettleLog(r: any, staffMap: Map<string, string>): SettleLo
   if (memoObj && typeof memoObj === 'object') {
     storeTotal = Math.max(0, Number((memoObj as any).storeTotal ?? 0))
     staffPay = Math.max(0, Number((memoObj as any).staffPay ?? staffPay ?? 0))
+    gabulAmount = Math.max(0, Number((memoObj as any).gabulAmount ?? 0))
     adminPay = Math.max(0, Number((memoObj as any).adminPay ?? 0))
     tip = Math.max(0, Number((memoObj as any).tip ?? 0))
     misu = Boolean((memoObj as any).misu)
@@ -494,6 +479,7 @@ export function deriveSettleLog(r: any, staffMap: Map<string, string>): SettleLo
     minutes,
     storeTotal,
     staffPay,
+    gabulAmount,
     adminPay,
     tip,
     misu,

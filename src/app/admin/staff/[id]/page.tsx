@@ -767,7 +767,14 @@ export default function AdminStaffDetailPage() {
       setLogsLoading(false)
       ssWrite(`pc_logs_${staffId}_${selectedYmd}_v2`, { ts: Date.now(), rows })
 
+      // 근무내역 저장 완료 시, 초이스에서 넘어온 가게/시간 프리셋은 소진 처리
+      try {
+        localStorage.removeItem(STAFF_PREFILL_KEY(staffId))
+      } catch {}
+
       // reset input
+      setSelectedStoreId('')
+      setStoreQuery('')
       setTokens([])
     } catch (e: any) {
       setError(e?.message ?? '저장 오류')

@@ -59,14 +59,12 @@ export function StaffListTab(props: StaffListTabProps) {
       { key: 'CAR_WAIT', label: '차대기중', rows: [], tone: 'text-amber-200/90' },
       { key: 'CHOICE_DONE', label: '초이스완료', rows: [], tone: 'text-emerald-200/90' },
       { key: 'ON', label: '출근', rows: [], tone: 'text-white/65' },
-      { key: 'OFF', label: '퇴근', rows: [], tone: 'text-rose-200/70' },
     ]
     for (const r of rowsAll) {
       if (r.work_status === 'CHOICE_ING') sections[0].rows.push(r)
       else if (r.work_status === 'CAR_WAIT') sections[1].rows.push(r)
       else if (r.work_status === 'CHOICE_DONE') sections[2].rows.push(r)
       else if (r.work_status && r.work_status !== 'OFF') sections[3].rows.push(r)
-      else sections[4].rows.push(r)
     }
     return sections
   }, [rowsAll])

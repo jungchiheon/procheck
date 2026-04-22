@@ -62,6 +62,7 @@ export type SettleLog = {
   minutes: number
   storeTotal: number
   staffPay: number
+  gabulAmount: number
   adminPay: number
   tip: number
   misu: boolean

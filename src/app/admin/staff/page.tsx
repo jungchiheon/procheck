@@ -125,6 +125,7 @@ export default function AdminStaffPage() {
       timeKo: string
       lineText: string
       staffPay: number
+        gabulAmount: number
       adminPay: number
       memoObj: any
     }>
@@ -307,12 +308,7 @@ export default function AdminStaffPage() {
 
     for (const id of uniq) {
       const key = STAFF_PREFILL_KEY(id)
-      if (status === 'CAR_WAIT') {
-        try {
-          localStorage.removeItem(key)
-        } catch {}
-        continue
-      }
+      if (status === 'CAR_WAIT') continue
       if (!prefill) continue
       try {
         localStorage.setItem(
@@ -811,15 +807,15 @@ export default function AdminStaffPage() {
     blocks.sort((a, b) => (a.staffName || '').localeCompare(b.staffName || '', 'ko'))
 
     return blocks.map((b) => {
-      const staffPaySum = b.logs.reduce((s, x) => s + (x.staffPay || 0), 0)
+      const grossStaffPaySum = b.logs.reduce((s, x) => s + Math.max(0, x.staffPay || 0), 0)
+      const gabulSum = b.logs.reduce((s, x) => s + Math.max(0, x.gabulAmount || 0), 0)
+      const finalStaffPaySum = Math.max(0, grossStaffPaySum - gabulSum)
       const adminPaySum = b.logs.reduce((s, x) => s + (x.adminPay || 0), 0)
 
-      // ✅ 직원 표시 금액: 1000원당 1
-      const staffUnit = Math.round(staffPaySum / 1000)
-      const cashStaffPay = b.logs.reduce((s, x) => s + (x.cash ? x.staffPay : 0), 0)
-      const nonCashStaffPay = b.logs.reduce((s, x) => s + (!x.cash ? x.staffPay : 0), 0)
-      const cashUnits = Math.round(cashStaffPay / 1000)
-      const nonCashUnits = Math.round(nonCashStaffPay / 1000)
+      // ✅ 직원 표시 금액: 1000원 단위
+      const settleUnit = Math.round(grossStaffPaySum / 1000)
+      const gabulUnit = Math.round(gabulSum / 1000)
+      const finalUnit = Math.round(finalStaffPaySum / 1000)
 
       const lines = b.logs.map((x) => {
         const seq = buildSettleLineFromMemo(x.memoObj) // ✅ 쌓는 방식 반영 + □□
@@ -831,6 +827,7 @@ export default function AdminStaffPage() {
           timeKo: formatTimeKoHm(x.work_at),
           seq,
           staffPay: x.staffPay,
+          gabulAmount: x.gabulAmount,
           adminPay: x.adminPay,
           memoObj: x.memoObj,
         }
@@ -839,9 +836,9 @@ export default function AdminStaffPage() {
       return {
         staffId: b.staffId,
         staffName: b.staffName,
-        staffUnit,
-        cashUnits,
-        nonCashUnits,
+        settleUnit,
+        gabulUnit,
+        finalUnit,
         adminPaySum,
         lines,
       }
@@ -1040,6 +1037,7 @@ export default function AdminStaffPage() {
           timeKo: ln.timeKo,
           lineText: ln.seq,
           staffPay: Math.max(0, Number(ln.staffPay || 0)),
+          gabulAmount: Math.max(0, Number(ln.gabulAmount || 0)),
           adminPay: Math.max(0, Number(ln.adminPay || 0)),
           memoObj: ln.memoObj && typeof ln.memoObj === 'object' ? ln.memoObj : {},
         })),
@@ -1053,24 +1051,19 @@ export default function AdminStaffPage() {
     setSettleEditSaving(true)
     setSettleError(null)
     try {
-      for (const row of settleEditModal.rows) {
-        if (!row.paymentId) continue
-        const memoObj = row.memoObj && typeof row.memoObj === 'object' ? { ...row.memoObj } : {}
-        memoObj.staffPay = Math.max(0, Number(row.staffPay || 0))
-        memoObj.adminPay = Math.max(0, Number(row.adminPay || 0))
-        const manualLine = row.lineText.trim()
-        if (manualLine) memoObj.manualSettleLine = manualLine
-        else delete memoObj.manualSettleLine
-
-        const { error } = await supabaseClient
-          .from('staff_payment_logs')
-          .update({
-            amount: Math.max(0, Number(row.staffPay || 0)),
-            memo: JSON.stringify(memoObj),
-          })
-          .eq('id', row.paymentId)
-        if (error) throw new Error(error.message)
-      }
+      const { data: sess } = await supabaseClient.auth.getSession()
+      const token = sess.session?.access_token
+      if (!token) throw new Error('세션이 만료되었습니다. 다시 로그인 해주세요.')
+      const res = await fetch('/api/admin/staff/settlement-update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          staffId: settleEditModal.staffId,
+          rows: settleEditModal.rows,
+        }),
+      })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(String((json as { error?: string })?.error ?? '정산 수정 저장 실패'))
       setSettleEditModal(null)
       await runSettlementDay(settleYmd, { silent: true })
     } catch (e: any) {
@@ -1599,10 +1592,9 @@ export default function AdminStaffPage() {
                 const proc = normalizeProcessKey(dayMap?.[settleYmd])
                 const headerOne = buildSettleStaffHeaderLine({
                   staffName: b.staffName,
-                  cashUnits: b.cashUnits,
-                  nonCashUnits: b.nonCashUnits,
-                  staffUnit: b.staffUnit,
-                  proc,
+                  settleUnit: b.settleUnit,
+                  gabulUnit: b.gabulUnit,
+                  finalUnit: b.finalUnit,
                 })
                 return (
                   <div
@@ -1714,7 +1706,7 @@ export default function AdminStaffPage() {
                       <div className="text-[11px] text-white/55">
                         {row.storeName} · {row.timeKo}
                       </div>
-                      <div className="mt-2 grid grid-cols-2 gap-2">
+                      <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-3">
                         <div>
                           <label className="text-[11px] text-white/70">정산금액</label>
                           <input
@@ -1732,7 +1724,27 @@ export default function AdminStaffPage() {
                                   : prev
                               )
                             }}
-                            className="mt-1 w-full rounded-lg border border-white/12 bg-zinc-900 px-2.5 py-2 text-[12px] text-white outline-none focus:border-white/25"
+                            className="mt-1 w-full rounded-lg border border-white/12 bg-zinc-900 px-2.5 py-2 text-[12px] text-white outline-none focus:border-white/25 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[11px] text-white/70">가불</label>
+                          <input
+                            type="number"
+                            min={0}
+                            value={row.gabulAmount}
+                            onChange={(e) => {
+                              const n = Math.max(0, Number(e.target.value || 0))
+                              setSettleEditModal((prev) =>
+                                prev
+                                  ? {
+                                      ...prev,
+                                      rows: prev.rows.map((r, i) => (i === idx ? { ...r, gabulAmount: n } : r)),
+                                    }
+                                  : prev
+                              )
+                            }}
+                            className="mt-1 w-full rounded-lg border border-white/12 bg-zinc-900 px-2.5 py-2 text-[12px] text-white outline-none focus:border-white/25 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                           />
                         </div>
                         <div>
@@ -1752,7 +1764,7 @@ export default function AdminStaffPage() {
                                   : prev
                               )
                             }}
-                            className="mt-1 w-full rounded-lg border border-white/12 bg-zinc-900 px-2.5 py-2 text-[12px] text-white outline-none focus:border-white/25"
+                            className="mt-1 w-full rounded-lg border border-white/12 bg-zinc-900 px-2.5 py-2 text-[12px] text-white outline-none focus:border-white/25 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                           />
                         </div>
                       </div>
@@ -1782,6 +1794,18 @@ export default function AdminStaffPage() {
                     <span>
                       정산 합계{' '}
                       <b className="text-white/85">{formatMoneyDotThousands(settleEditModal.rows.reduce((s, r) => s + Math.max(0, Number(r.staffPay || 0)), 0))}</b>
+                    </span>
+                    <span>
+                      가불 합계{' '}
+                      <b className="text-amber-200/95">{formatMoneyDotThousands(settleEditModal.rows.reduce((s, r) => s + Math.max(0, Number(r.gabulAmount || 0)), 0))}</b>
+                    </span>
+                    <span>
+                      최종 정산{' '}
+                      <b className="text-cyan-200/95">
+                        {formatMoneyDotThousands(
+                          settleEditModal.rows.reduce((s, r) => s + Math.max(0, Number(r.staffPay || 0) - Number(r.gabulAmount || 0)), 0)
+                        )}
+                      </b>
                     </span>
                     <span>
                       수익 합계{' '}
